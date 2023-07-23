@@ -1,0 +1,3 @@
+[submodule "stm32-w25qxx"]
+	path = stm32-w25qxx
+	url = https://github.com/lbthomsen/stm32-w25qxx
