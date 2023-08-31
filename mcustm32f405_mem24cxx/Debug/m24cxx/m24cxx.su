@@ -1,0 +1,7 @@
+../m24cxx/m24cxx.c:27:22:m24cxx_init	24	static
+../m24cxx/m24cxx.c:44:22:m24cxx_isconnected	16	static
+../m24cxx/m24cxx.c:53:22:m24cxx_wait	24	static
+../m24cxx/m24cxx.c:62:22:m24cxx_read	80	static
+../m24cxx/m24cxx.c:96:22:m24cxx_write	80	static
+../m24cxx/m24cxx.c:143:22:m24cxx_erase	64	dynamic
+../m24cxx/m24cxx.c:158:22:m24cxx_erase_all	280	static

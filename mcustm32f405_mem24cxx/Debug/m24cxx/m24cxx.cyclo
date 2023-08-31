@@ -1,0 +1,7 @@
+../m24cxx/m24cxx.c:27:22:m24cxx_init	2
+../m24cxx/m24cxx.c:44:22:m24cxx_isconnected	2
+../m24cxx/m24cxx.c:53:22:m24cxx_wait	3
+../m24cxx/m24cxx.c:62:22:m24cxx_read	6
+../m24cxx/m24cxx.c:96:22:m24cxx_write	7
+../m24cxx/m24cxx.c:143:22:m24cxx_erase	2
+../m24cxx/m24cxx.c:158:22:m24cxx_erase_all	3
