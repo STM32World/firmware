@@ -142,11 +142,40 @@ int main(void) {
         Error_Handler();
     }
 
+    //m24cxx_erase_all(&m24cxx);
+    uint8_t buf[4 * M24CXX_WRITE_PAGE_SIZE];
+
+    memset(buf, 0xff, sizeof(buf));
+
+    if (m24cxx_write(&m24cxx, 0x00000000, (uint8_t *)&buf, sizeof(buf))) {
+        DBG("M24CXX Failed to write");
+        Error_Handler();
+    }
+
+    if (m24cxx_write(&m24cxx, 0x00020000, (uint8_t *)&buf, sizeof(buf))) {
+        DBG("M24CXX Failed to write");
+        Error_Handler();
+    }
+
     /* USER CODE END 2 */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
+
+    uint32_t now = 0, last_blink = 0;
+
     while (1) {
+
+        now = HAL_GetTick();
+
+        if (now - last_blink >= 500) {
+
+            HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+            last_blink = now;
+
+        }
+
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
@@ -210,7 +239,7 @@ static void MX_I2C1_Init(void) {
 
     /* USER CODE END I2C1_Init 1 */
     hi2c1.Instance = I2C1;
-    hi2c1.Init.ClockSpeed = 100000;
+    hi2c1.Init.ClockSpeed = 400000;
     hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
     hi2c1.Init.OwnAddress1 = 0;
     hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -264,13 +293,25 @@ static void MX_USART1_UART_Init(void) {
  * @retval None
  */
 static void MX_GPIO_Init(void) {
+    GPIO_InitTypeDef GPIO_InitStruct = { 0 };
     /* USER CODE BEGIN MX_GPIO_Init_1 */
     /* USER CODE END MX_GPIO_Init_1 */
 
     /* GPIO Ports Clock Enable */
+    __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOH_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    /*Configure GPIO pin Output Level */
+    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+
+    /*Configure GPIO pin : LED_Pin */
+    GPIO_InitStruct.Pin = LED_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
     /* USER CODE BEGIN MX_GPIO_Init_2 */
     /* USER CODE END MX_GPIO_Init_2 */
