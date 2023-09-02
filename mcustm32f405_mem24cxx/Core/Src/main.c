@@ -41,6 +41,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+CRC_HandleTypeDef hcrc;
+
 I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart1;
@@ -59,6 +61,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_CRC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -112,6 +115,7 @@ int main(void) {
     MX_GPIO_Init();
     MX_I2C1_Init();
     MX_USART1_UART_Init();
+    MX_CRC_Init();
     /* USER CODE BEGIN 2 */
 
     DBG("\n\n\n--------\nStarting");
@@ -137,25 +141,96 @@ int main(void) {
 
     printf("\n");
 
+    DBG("Initializing %s - %lu kB EEPROM", M24CXX_TYPE, M24CXX_SIZE / 1024);
+
     if (m24cxx_init(&m24cxx, &hi2c1, 0x50) != M24CXX_Ok) {
         DBG("M24CXX Failed to initialize");
         Error_Handler();
     }
 
-    //m24cxx_erase_all(&m24cxx);
-    uint8_t buf[4 * M24CXX_WRITE_PAGE_SIZE];
+    uint32_t start_time;
 
-    memset(buf, 0xff, sizeof(buf));
-
-    if (m24cxx_write(&m24cxx, 0x00000000, (uint8_t *)&buf, sizeof(buf))) {
-        DBG("M24CXX Failed to write");
+    DBG("Erasing all");
+    start_time = HAL_GetTick();
+    if (m24cxx_erase_all(&m24cxx) != M24CXX_Ok) {
+        DBG("Erase all failed");
         Error_Handler();
     }
+    DBG("Erase all took - %lu s", (HAL_GetTick() - start_time) / 1000);
 
-    if (m24cxx_write(&m24cxx, 0x00020000, (uint8_t *)&buf, sizeof(buf))) {
-        DBG("M24CXX Failed to write");
-        Error_Handler();
+    uint8_t buf[M24CXX_WRITE_PAGE_SIZE];
+    uint32_t crc;
+
+    start_time = HAL_GetTick();
+    for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
+        if (m24cxx_read(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
+            DBG("Read Error");
+            Error_Handler();
+        }
+        if (i == 0)
+            crc = HAL_CRC_Calculate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+        else
+            crc = HAL_CRC_Accumulate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
     }
+    DBG("Read all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
+
+    memset(buf, 0x00, sizeof(buf));
+
+    DBG("Writing all zeros");
+    start_time = HAL_GetTick();
+    for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
+        if (m24cxx_write(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
+            DBG("Write Error");
+            Error_Handler();
+        }
+        if (i == 0)
+            crc = HAL_CRC_Calculate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+        else
+            crc = HAL_CRC_Accumulate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+    }
+    DBG("Write all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
+
+    start_time = HAL_GetTick();
+    for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
+        if (m24cxx_read(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
+            DBG("Read Error");
+            Error_Handler();
+        }
+        if (i == 0)
+            crc = HAL_CRC_Calculate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+        else
+            crc = HAL_CRC_Accumulate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+    }
+    DBG("Read all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
+
+    memset(buf, 0xaa, sizeof(buf));
+
+    DBG("Writing 10101010");
+    start_time = HAL_GetTick();
+    for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
+        if (m24cxx_write(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
+            DBG("Write Error");
+            Error_Handler();
+        }
+        if (i == 0)
+            crc = HAL_CRC_Calculate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+        else
+            crc = HAL_CRC_Accumulate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+    }
+    DBG("Write all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
+
+    start_time = HAL_GetTick();
+    for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
+        if (m24cxx_read(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
+            DBG("Read Error");
+            Error_Handler();
+        }
+        if (i == 0)
+            crc = HAL_CRC_Calculate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+        else
+            crc = HAL_CRC_Accumulate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+    }
+    DBG("Read all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
 
     /* USER CODE END 2 */
 
@@ -222,6 +297,30 @@ void SystemClock_Config(void) {
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
         Error_Handler();
     }
+}
+
+/**
+ * @brief CRC Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_CRC_Init(void) {
+
+    /* USER CODE BEGIN CRC_Init 0 */
+
+    /* USER CODE END CRC_Init 0 */
+
+    /* USER CODE BEGIN CRC_Init 1 */
+
+    /* USER CODE END CRC_Init 1 */
+    hcrc.Instance = CRC;
+    if (HAL_CRC_Init(&hcrc) != HAL_OK) {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN CRC_Init 2 */
+
+    /* USER CODE END CRC_Init 2 */
+
 }
 
 /**
