@@ -1,6 +1,8 @@
 [submodule "stm32-w25qxx"]
 	path = stm32-w25qxx
 	url = https://github.com/lbthomsen/stm32-w25qxx
+	branch = master
 [submodule "stm32-m24cxx"]
 	path = stm32-m24cxx
 	url = git@github.com:lbthomsen/stm32-m24cxx.git
+	branch = master

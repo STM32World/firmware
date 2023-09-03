@@ -1,7 +1,6 @@
-../m24cxx/m24cxx.c:27:22:i2c_wait	24	static
-../m24cxx/m24cxx.c:40:22:m24cxx_init	24	static
-../m24cxx/m24cxx.c:57:22:m24cxx_isconnected	16	static
-../m24cxx/m24cxx.c:66:22:m24cxx_read	80	static
-../m24cxx/m24cxx.c:100:22:m24cxx_write	88	static
-../m24cxx/m24cxx.c:148:22:m24cxx_erase	64	dynamic
-../m24cxx/m24cxx.c:163:22:m24cxx_erase_all	280	static
+../m24cxx/m24cxx.c:34:22:i2c_wait	16	static
+../m24cxx/m24cxx.c:78:22:m24cxx_isconnected	8	static
+../m24cxx/m24cxx.c:55:22:m24cxx_init	8	static
+../m24cxx/m24cxx.c:96:22:m24cxx_read	64	static
+../m24cxx/m24cxx.c:140:22:m24cxx_write	64	static
+../m24cxx/m24cxx.c:195:22:m24cxx_erase_all	272	static

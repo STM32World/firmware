@@ -141,7 +141,7 @@ int main(void) {
 
     printf("\n");
 
-    DBG("Initializing %s - %lu kB EEPROM", M24CXX_TYPE, M24CXX_SIZE / 1024);
+    DBG("Initializing %s - %u kB EEPROM", M24CXX_TYPE, M24CXX_SIZE / 1024);
 
     if (m24cxx_init(&m24cxx, &hi2c1, 0x50) != M24CXX_Ok) {
         DBG("M24CXX Failed to initialize");
@@ -159,7 +159,7 @@ int main(void) {
     DBG("Erase all took - %lu s", (HAL_GetTick() - start_time) / 1000);
 
     uint8_t buf[M24CXX_WRITE_PAGE_SIZE];
-    uint32_t crc;
+    uint32_t crc = 0;
 
     start_time = HAL_GetTick();
     for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
@@ -403,7 +403,7 @@ static void MX_GPIO_Init(void) {
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
     /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOC, LED_Pin | EEPROM_WP_Pin, GPIO_PIN_SET);
 
     /*Configure GPIO pin : LED_Pin */
     GPIO_InitStruct.Pin = LED_Pin;
@@ -411,6 +411,13 @@ static void MX_GPIO_Init(void) {
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+    /*Configure GPIO pin : EEPROM_WP_Pin */
+    GPIO_InitStruct.Pin = EEPROM_WP_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(EEPROM_WP_GPIO_Port, &GPIO_InitStruct);
 
     /* USER CODE BEGIN MX_GPIO_Init_2 */
     /* USER CODE END MX_GPIO_Init_2 */
