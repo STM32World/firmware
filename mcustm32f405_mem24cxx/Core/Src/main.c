@@ -148,6 +148,8 @@ int main(void) {
         Error_Handler();
     }
 
+    uint8_t buf[M24CXX_WRITE_PAGE_SIZE];
+    uint32_t crc = 0;
     uint32_t start_time;
 
     DBG("Erasing all");
@@ -157,9 +159,6 @@ int main(void) {
         Error_Handler();
     }
     DBG("Erase all took - %lu s", (HAL_GetTick() - start_time) / 1000);
-
-    uint8_t buf[M24CXX_WRITE_PAGE_SIZE];
-    uint32_t crc = 0;
 
     start_time = HAL_GetTick();
     for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
@@ -175,8 +174,35 @@ int main(void) {
     DBG("Read all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
 
     memset(buf, 0x00, sizeof(buf));
+    DBG("Writing all 0x00");
+    start_time = HAL_GetTick();
+    for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
+        if (m24cxx_write(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
+            DBG("Write Error");
+            Error_Handler();
+        }
+        if (i == 0)
+            crc = HAL_CRC_Calculate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+        else
+            crc = HAL_CRC_Accumulate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+    }
+    DBG("Write all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
 
-    DBG("Writing all zeros");
+    start_time = HAL_GetTick();
+    for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
+        if (m24cxx_read(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
+            DBG("Read Error");
+            Error_Handler();
+        }
+        if (i == 0)
+            crc = HAL_CRC_Calculate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+        else
+            crc = HAL_CRC_Accumulate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
+    }
+    DBG("Read all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
+
+    memset(buf, 0x55, sizeof(buf));
+    DBG("Writing all 0x55");
     start_time = HAL_GetTick();
     for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
         if (m24cxx_write(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
@@ -204,8 +230,7 @@ int main(void) {
     DBG("Read all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
 
     memset(buf, 0xaa, sizeof(buf));
-
-    DBG("Writing 10101010");
+    DBG("Writing all 0xaa");
     start_time = HAL_GetTick();
     for (int i = 0; i < M24CXX_SIZE / sizeof(buf); ++i) {
         if (m24cxx_write(&m24cxx, i * sizeof(buf), (uint8_t*) &buf, sizeof(buf)) != M24CXX_Ok) {
@@ -231,6 +256,8 @@ int main(void) {
             crc = HAL_CRC_Accumulate(&hcrc, (uint32_t*) &buf, sizeof(buf) / 4);
     }
     DBG("Read all took - %lu s - CRC = 0x%08lx", (HAL_GetTick() - start_time) / 1000, crc);
+
+    DBG("Done Testing - entering main loop");
 
     /* USER CODE END 2 */
 
