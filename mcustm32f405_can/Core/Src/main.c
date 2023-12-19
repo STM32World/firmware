@@ -6,7 +6,7 @@
  ******************************************************************************
  * @attention
  *
- * Copyright (c) 2023 STMicroelectronics.
+ * Copyright (c) 2023 Lars Boegild Thomsen <lbthomsen@gmail.com>
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -41,13 +41,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
+CAN_HandleTypeDef hcan2;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static uint8_t message_waiting = 0;
-CAN_FilterTypeDef can_filter;
-
 
 CAN_RxHeaderTypeDef RxHeader;
 uint8_t RxData[8];
@@ -59,6 +57,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_CAN2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -84,7 +83,7 @@ int _write(int fd, char *ptr, int len) {
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_RxFifo0MsgPendingCallback");
-    if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) {
+    if (HAL_CAN_GetRxMessage(&hcan2, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) {
         Error_Handler();
     }
     //message_waiting = 1;
@@ -122,38 +121,30 @@ int main(void)
   MX_GPIO_Init();
   MX_CAN1_Init();
   MX_USART1_UART_Init();
+  MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
 
     DBG("\n\n\n\n--------\nStarting");
 
-    DBG("Starting CAN");
-    HAL_CAN_Start(&hcan1);
 
     DBG("Activating CAN notification");
-    if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
+    if (HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
+        DBG("Failed");
         Error_Handler();
     }
 
-    can_filter.FilterActivation = CAN_FILTER_ENABLE;
-    can_filter.FilterBank = 0;
-    can_filter.FilterFIFOAssignment = CAN_RX_FIFO0;
-    can_filter.FilterIdHigh = 0x0000;
-    can_filter.FilterIdLow = 0x0000;
-    can_filter.FilterMaskIdHigh = 0x0000;
-    can_filter.FilterMaskIdLow = 0x0000;
-    can_filter.FilterMode = CAN_FILTERMODE_IDMASK;
-    can_filter.FilterScale = CAN_FILTERSCALE_32BIT;
-    can_filter.SlaveStartFilterBank = 16;
-
-    HAL_CAN_ConfigFilter(&hcan1, &can_filter);
-
+    DBG("Starting CAN");
+    if (HAL_CAN_Start(&hcan2) != HAL_OK) {
+        DBG("Failed");
+        Error_Handler();
+    }
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-    uint32_t now = 0, last_blink = 0, last_can_tx = 0;
+    uint32_t now = 0, last_blink = 0, last_can_tx = 0, last_tick = 0;
 
     CAN_TxHeaderTypeDef TxHeader;
 
@@ -176,34 +167,50 @@ int main(void)
 
             DBG("Sending data");
 
-            TxHeader.DLC = 8;
+            TxHeader.DLC = 2;
             TxHeader.ExtId = 0;
             TxHeader.IDE = CAN_ID_STD;
             TxHeader.RTR = CAN_RTR_DATA;
             TxHeader.StdId = 0x111;
             TxHeader.TransmitGlobalTime = DISABLE;
 
+            TxData[0] = 0x01;
+            TxData[1] = 0x02;
+            TxData[2] = 0x03;
+            TxData[3] = 0x04;
+
+
             TxData[0] = 50;
             TxData[1] = 0xAA;
 
-            if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) == HAL_OK) {
+            if (HAL_CAN_AddTxMessage(&hcan2, &TxHeader, &TxData[0], &TxMailbox) == HAL_OK) {
                 DBG("Mailbox was %lu", TxMailbox);
             } else {
-               Error_Handler ();
+                Error_Handler();
             }
 
             last_can_tx = now;
         }
 
-        if (message_waiting) {
-            DBG("Receiving CAN Message");
+        if (now - last_tick >= 1000) {
 
-            if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) {
-                Error_Handler();
-            }
+            uint32_t fill_rx = HAL_CAN_GetRxFifoFillLevel(&hcan2, 0);
+            uint32_t fill_tx = HAL_CAN_GetTxMailboxesFreeLevel(&hcan2);
 
-            message_waiting = 0;
+            DBG("Tick %lu - tx free = %lu, fill = %lu", now / 1000, fill_tx, fill_rx);
+
+            last_tick = now;
         }
+
+//        if (message_waiting) {
+//            DBG("Receiving CAN Message");
+//
+//            if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) {
+//                Error_Handler();
+//            }
+//
+//            message_waiting = 0;
+//        }
 
     /* USER CODE END WHILE */
 
@@ -273,8 +280,8 @@ static void MX_CAN1_Init(void)
 
   /* USER CODE END CAN1_Init 1 */
   hcan1.Instance = CAN1;
-  hcan1.Init.Prescaler = 16;
-  hcan1.Init.Mode = CAN_MODE_LOOPBACK;
+  hcan1.Init.Prescaler = 32;
+  hcan1.Init.Mode = CAN_MODE_SILENT_LOOPBACK;
   hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan1.Init.TimeSeg1 = CAN_BS1_1TQ;
   hcan1.Init.TimeSeg2 = CAN_BS2_1TQ;
@@ -290,7 +297,76 @@ static void MX_CAN1_Init(void)
   }
   /* USER CODE BEGIN CAN1_Init 2 */
 
+  CAN_FilterTypeDef canfilterconfig;
+
+  canfilterconfig.FilterActivation = CAN_FILTER_ENABLE;
+  canfilterconfig.FilterBank = 1;  // anything between 0 to SlaveStartFilterBank
+  canfilterconfig.FilterFIFOAssignment = CAN_RX_FIFO0;
+  canfilterconfig.FilterIdHigh = 0x0000;
+  canfilterconfig.FilterIdLow = 0x0000;
+  //canfilterconfig.FilterMaskIdHigh = 0x1<<13;
+  canfilterconfig.FilterMaskIdHigh = 0x0000;
+  canfilterconfig.FilterMaskIdLow = 0x0000;
+  canfilterconfig.FilterMode = CAN_FILTERMODE_IDMASK;
+  canfilterconfig.FilterScale = CAN_FILTERSCALE_32BIT;
+  canfilterconfig.SlaveStartFilterBank = 13;  // 13 to 27 are assigned to slave CAN (CAN 2) OR 0 to 12 are assgned to CAN1
+
+  HAL_CAN_ConfigFilter(&hcan1, &canfilterconfig);
+
   /* USER CODE END CAN1_Init 2 */
+
+}
+
+/**
+  * @brief CAN2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CAN2_Init(void)
+{
+
+  /* USER CODE BEGIN CAN2_Init 0 */
+
+  /* USER CODE END CAN2_Init 0 */
+
+  /* USER CODE BEGIN CAN2_Init 1 */
+
+  /* USER CODE END CAN2_Init 1 */
+  hcan2.Instance = CAN2;
+  hcan2.Init.Prescaler = 16;
+  hcan2.Init.Mode = CAN_MODE_LOOPBACK;
+  hcan2.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan2.Init.TimeSeg1 = CAN_BS1_1TQ;
+  hcan2.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan2.Init.TimeTriggeredMode = DISABLE;
+  hcan2.Init.AutoBusOff = DISABLE;
+  hcan2.Init.AutoWakeUp = DISABLE;
+  hcan2.Init.AutoRetransmission = DISABLE;
+  hcan2.Init.ReceiveFifoLocked = DISABLE;
+  hcan2.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CAN2_Init 2 */
+
+  CAN_FilterTypeDef canfilterconfig;
+
+  canfilterconfig.FilterActivation = CAN_FILTER_ENABLE;
+  canfilterconfig.FilterBank = 20;  // anything between 0 to SlaveStartFilterBank
+  canfilterconfig.FilterFIFOAssignment = CAN_RX_FIFO0;
+  canfilterconfig.FilterIdHigh = 0x0000;
+  canfilterconfig.FilterIdLow = 0x0000;
+  //canfilterconfig.FilterMaskIdHigh = 0x1<<13;
+  canfilterconfig.FilterMaskIdHigh = 0x0000;
+  canfilterconfig.FilterMaskIdLow = 0x0000;
+  canfilterconfig.FilterMode = CAN_FILTERMODE_IDMASK;
+  canfilterconfig.FilterScale = CAN_FILTERSCALE_32BIT;
+  canfilterconfig.SlaveStartFilterBank = 13;  // 13 to 27 are assigned to slave CAN (CAN 2) OR 0 to 12 are assgned to CAN1
+
+  HAL_CAN_ConfigFilter(&hcan2, &canfilterconfig);
+
+  /* USER CODE END CAN2_Init 2 */
 
 }
 
@@ -341,8 +417,8 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
