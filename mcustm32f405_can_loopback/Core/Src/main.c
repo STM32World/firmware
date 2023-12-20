@@ -54,7 +54,7 @@ uint32_t TxMailbox;
 uint8_t TxData[8];
 uint8_t RxData[8];
 
-uint8_t count = 0;
+uint32_t msg_count = 0;
 
 
 /* USER CODE END PV */
@@ -120,9 +120,9 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
     DBG("HAL_CAN_RxFifo0MsgPendingCallback");
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK) {
-        DBG("Got message - id = 0x%04lx len = 0x%lx", RxHeader.StdId, RxHeader.DLC);
+        DBG("Got message %lu - id = 0x%04lx len = 0x%lx, data=%02x%02x%02x%02x%02x%02x%02x%02x", msg_count + 1, RxHeader.StdId, RxHeader.DLC, RxData[0], RxData[1], RxData[2], RxData[3], RxData[4], RxData[5], RxData[6], RxData[7]);
     }
-    count++;
+    msg_count++;
 }
 
 void HAL_CAN_RxFifo0FullCallback(CAN_HandleTypeDef *hcan)
@@ -154,25 +154,6 @@ void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
 {
     DBG("HAL_CAN_ErrorCallback");
 }
-
-
-
-// CAN Callbacks
-
-//void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-//    DBG("HAL_CAN_RxFifo0MsgPendingCallback on %d", hcan->Instance);
-//
-//    if (hcan->Instance == CAN1) {
-//        if (HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) {
-//            Error_Handler();
-//        }
-//    } else {
-//        if (HAL_CAN_GetRxMessage(&hcan2, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) {
-//                    Error_Handler();
-//                }
-//    }
-//    //message_waiting = 1;
-//}
 
 /* USER CODE END 0 */
 
@@ -213,14 +194,14 @@ int main(void)
     CAN_FilterTypeDef canfilterconfig;
 
     canfilterconfig.FilterActivation = CAN_FILTER_ENABLE;
-    canfilterconfig.FilterBank = 10;  // anything between 0 to SlaveStartFilterBank
+    canfilterconfig.FilterBank = 12;  // anything between 0 to SlaveStartFilterBank
     canfilterconfig.FilterFIFOAssignment = CAN_RX_FIFO0;
     //canfilterconfig.FilterIdHigh = 0x103<<5;
     canfilterconfig.FilterIdHigh = 0x0000;
     canfilterconfig.FilterIdLow = 0x0000;
     //canfilterconfig.FilterMaskIdHigh = 0x1<<13;
     canfilterconfig.FilterMaskIdHigh = 0x0;
-    canfilterconfig.FilterMaskIdLow = 0x0000;
+    canfilterconfig.FilterMaskIdLow = 0x0;
     canfilterconfig.FilterMode = CAN_FILTERMODE_IDMASK;
     canfilterconfig.FilterScale = CAN_FILTERSCALE_32BIT;
     canfilterconfig.SlaveStartFilterBank = 13;  // 13 to 27 are assigned to slave CAN (CAN 2) OR 0 to 12 are assgned to CAN1
@@ -229,7 +210,23 @@ int main(void)
 
     HAL_CAN_Start(&hcan1);
 
-    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY | CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_RX_FIFO0_FULL | CAN_IT_RX_FIFO0_OVERRUN | CAN_IT_RX_FIFO1_MSG_PENDING | CAN_IT_RX_FIFO1_FULL | CAN_IT_RX_FIFO1_OVERRUN | CAN_IT_WAKEUP | CAN_IT_SLEEP_ACK | CAN_IT_ERROR_WARNING | CAN_IT_ERROR_PASSIVE | CAN_IT_BUSOFF | CAN_IT_LAST_ERROR_CODE | CAN_IT_ERROR);
+    HAL_CAN_ActivateNotification(
+            &hcan1,
+            CAN_IT_TX_MAILBOX_EMPTY |
+            CAN_IT_RX_FIFO0_MSG_PENDING |
+            CAN_IT_RX_FIFO0_FULL |
+            CAN_IT_RX_FIFO0_OVERRUN |
+            CAN_IT_RX_FIFO1_MSG_PENDING |
+            CAN_IT_RX_FIFO1_FULL |
+            CAN_IT_RX_FIFO1_OVERRUN |
+            CAN_IT_WAKEUP |
+            CAN_IT_SLEEP_ACK |
+            CAN_IT_ERROR_WARNING |
+            CAN_IT_ERROR_PASSIVE |
+            CAN_IT_BUSOFF |
+            CAN_IT_LAST_ERROR_CODE |
+            CAN_IT_ERROR
+        );
 
   /* USER CODE END 2 */
 
@@ -248,15 +245,8 @@ int main(void)
             TxHeader.ExtId = 0;
             TxHeader.IDE = CAN_ID_STD;
             TxHeader.RTR = CAN_RTR_DATA;
-            TxHeader.StdId = 0x101;
-            TxHeader.TransmitGlobalTime = DISABLE;
-
-            //uint32_t tx = now;
-
-//            TxData[0] = 0x01;
-//            TxData[1] = 0x02;
-//            TxData[2] = 0x03;
-//            TxData[3] = 0x04;
+            TxHeader.StdId = 0x601;
+            //TxHeader.TransmitGlobalTime = DISABLE;
 
             if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK)
             {
