@@ -56,7 +56,6 @@ uint8_t RxData[8];
 
 uint32_t msg_count = 0;
 
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
