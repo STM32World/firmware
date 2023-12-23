@@ -32,6 +32,9 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define CAN_ID_NOW 0b11000000000
+#define CAN_ID_RND 0b10000000000
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,6 +45,8 @@
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan1;
 CAN_HandleTypeDef hcan2;
+
+RNG_HandleTypeDef hrng;
 
 UART_HandleTypeDef huart1;
 
@@ -66,6 +71,7 @@ static void MX_GPIO_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_CAN2_Init(void);
+static void MX_RNG_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -121,9 +127,39 @@ void HAL_CAN_TxMailbox2AbortCallback(CAN_HandleTypeDef *hcan)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
     DBG("HAL_CAN_RxFifo0MsgPendingCallback");
-    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK) {
-        DBG("Got message %lu - id = 0x%04lx len = 0x%lx, data=%02x%02x%02x%02x%02x%02x%02x%02x", msg_count + 1, RxHeader.StdId, RxHeader.DLC, RxData[0], RxData[1], RxData[2], RxData[3], RxData[4], RxData[5], RxData[6], RxData[7]);
+
+    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) Error_Handler();
+
+    if (hcan->Instance == CAN1) {
+        if (RxHeader.RTR == CAN_RTR_REMOTE) {
+            if (RxHeader.StdId == CAN_ID_NOW) {
+
+                TxHeader.DLC = 4;
+                TxHeader.ExtId = 0;
+                TxHeader.IDE = CAN_ID_STD;
+                TxHeader.RTR = CAN_RTR_DATA;
+                TxHeader.StdId = CAN_ID_NOW;
+
+                if (HAL_CAN_AddTxMessage(&hcan2, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK) Error_Handler();
+
+            } else if (RxHeader.StdId == CAN_ID_RND) {
+
+            } else {
+                DBG("CAN1 Unknown ID");
+            }
+        } else {
+            DBG("CAN1 Received data");
+        }
+    } else if (hcan->Instance == CAN2) {
+
+    } else {
+        DBG("Unknown CAN Instance");
     }
+
+
+//    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK) {
+//        DBG("Got message %lu - id = 0x%04lx len = 0x%lx, data=%02x%02x%02x%02x%02x%02x%02x%02x", msg_count + 1, RxHeader.StdId, RxHeader.DLC, RxData[0], RxData[1], RxData[2], RxData[3], RxData[4], RxData[5], RxData[6], RxData[7]);
+//    }
     msg_count++;
 }
 
@@ -190,6 +226,7 @@ int main(void)
   MX_CAN1_Init();
   MX_USART1_UART_Init();
   MX_CAN2_Init();
+  MX_RNG_Init();
   /* USER CODE BEGIN 2 */
 
     DBG("\n\n\n\n\n------------\nCAN Starting");
@@ -210,6 +247,10 @@ int main(void)
     canfilterconfig.SlaveStartFilterBank = 13;  // 13 to 27 are assigned to slave CAN (CAN 2) OR 0 to 12 are assgned to CAN1
 
     HAL_CAN_ConfigFilter(&hcan1, &canfilterconfig);
+
+    canfilterconfig.FilterBank = 13;
+
+    HAL_CAN_ConfigFilter(&hcan2, &canfilterconfig);
 
     HAL_CAN_Start(&hcan1);
 
@@ -268,7 +309,7 @@ int main(void)
             TxHeader.ExtId = 0;
             TxHeader.IDE = CAN_ID_STD;
             TxHeader.RTR = CAN_RTR_DATA;
-            TxHeader.StdId = 0x601;
+            TxHeader.StdId = CAN_ID_NOW;
             //TxHeader.TransmitGlobalTime = DISABLE;
 
             if (HAL_CAN_AddTxMessage(&hcan2, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK)
@@ -318,7 +359,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -410,6 +451,32 @@ static void MX_CAN2_Init(void)
   /* USER CODE BEGIN CAN2_Init 2 */
 
   /* USER CODE END CAN2_Init 2 */
+
+}
+
+/**
+  * @brief RNG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RNG_Init(void)
+{
+
+  /* USER CODE BEGIN RNG_Init 0 */
+
+  /* USER CODE END RNG_Init 0 */
+
+  /* USER CODE BEGIN RNG_Init 1 */
+
+  /* USER CODE END RNG_Init 1 */
+  hrng.Instance = RNG;
+  if (HAL_RNG_Init(&hrng) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RNG_Init 2 */
+
+  /* USER CODE END RNG_Init 2 */
 
 }
 
