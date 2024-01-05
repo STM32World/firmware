@@ -151,7 +151,25 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
             DBG("CAN1 Received data");
         }
     } else if (hcan->Instance == CAN2) {
+        if (RxHeader.RTR == CAN_RTR_REMOTE) {
+             if (RxHeader.StdId == CAN_ID_NOW) {
 
+                 TxHeader.DLC = 4;
+                 TxHeader.ExtId = 0;
+                 TxHeader.IDE = CAN_ID_STD;
+                 TxHeader.RTR = CAN_RTR_DATA;
+                 TxHeader.StdId = CAN_ID_NOW;
+
+                 if (HAL_CAN_AddTxMessage(&hcan2, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK) Error_Handler();
+
+             } else if (RxHeader.StdId == CAN_ID_RND) {
+
+             } else {
+                 DBG("CAN1 Unknown ID");
+             }
+         } else {
+             DBG("CAN1 Received data");
+         }
     } else {
         DBG("Unknown CAN Instance");
     }
