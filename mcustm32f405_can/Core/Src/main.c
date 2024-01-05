@@ -134,15 +134,33 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
         if (RxHeader.RTR == CAN_RTR_REMOTE) {
             if (RxHeader.StdId == CAN_ID_NOW) {
 
+                DBG("CAN1 got NOW request");
+
+                uint32_t now = HAL_GetTick();
+
                 TxHeader.DLC = 4;
                 TxHeader.ExtId = 0;
                 TxHeader.IDE = CAN_ID_STD;
                 TxHeader.RTR = CAN_RTR_DATA;
                 TxHeader.StdId = CAN_ID_NOW;
 
-                if (HAL_CAN_AddTxMessage(&hcan2, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK) Error_Handler();
+                if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK) Error_Handler();
 
             } else if (RxHeader.StdId == CAN_ID_RND) {
+
+                DBG("CAN1 got RND request");
+
+                uint32_t rnd;
+                if (HAL_RNG_GenerateRandomNumber(&hrng, &rnd) != HAL_OK) Error_Handler();
+
+                TxHeader.DLC = 4;
+                TxHeader.ExtId = 0;
+                TxHeader.IDE = CAN_ID_STD;
+                TxHeader.RTR = CAN_RTR_DATA;
+                TxHeader.StdId = CAN_ID_RND;
+
+                if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, (uint8_t *)&rnd, &TxMailbox) != HAL_OK) Error_Handler();
+
 
             } else {
                 DBG("CAN1 Unknown ID");
@@ -151,24 +169,22 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
             DBG("CAN1 Received data");
         }
     } else if (hcan->Instance == CAN2) {
-        if (RxHeader.RTR == CAN_RTR_REMOTE) {
+        if (RxHeader.RTR == CAN_RTR_DATA) {
              if (RxHeader.StdId == CAN_ID_NOW) {
 
-                 TxHeader.DLC = 4;
-                 TxHeader.ExtId = 0;
-                 TxHeader.IDE = CAN_ID_STD;
-                 TxHeader.RTR = CAN_RTR_DATA;
-                 TxHeader.StdId = CAN_ID_NOW;
+                 uint32_t *now = (uint32_t *)&RxData[0];
 
-                 if (HAL_CAN_AddTxMessage(&hcan2, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK) Error_Handler();
+                 DBG("CAN2 Got NOW data!  now = %lu", *now);
 
              } else if (RxHeader.StdId == CAN_ID_RND) {
 
+                 uint32_t *rnd = (uint32_t *)&RxData[0];
+
+                 DBG("CAN2 Got RND data!  rnd = 0x%08lx", *rnd);
+
              } else {
-                 DBG("CAN1 Unknown ID");
+                 DBG("CAN2 Unknown ID");
              }
-         } else {
-             DBG("CAN1 Received data");
          }
     } else {
         DBG("Unknown CAN Instance");
@@ -274,7 +290,7 @@ int main(void)
 
     HAL_CAN_ActivateNotification(
             &hcan1,
-            CAN_IT_TX_MAILBOX_EMPTY |
+            //CAN_IT_TX_MAILBOX_EMPTY |
             CAN_IT_RX_FIFO0_MSG_PENDING |
             CAN_IT_RX_FIFO0_FULL |
             CAN_IT_RX_FIFO0_OVERRUN |
@@ -294,7 +310,7 @@ int main(void)
 
     HAL_CAN_ActivateNotification(
             &hcan2,
-            CAN_IT_TX_MAILBOX_EMPTY |
+            //CAN_IT_TX_MAILBOX_EMPTY |
             CAN_IT_RX_FIFO0_MSG_PENDING |
             CAN_IT_RX_FIFO0_FULL |
             CAN_IT_RX_FIFO0_OVERRUN |
@@ -321,13 +337,21 @@ int main(void)
 
         now = HAL_GetTick();
 
-        if (now - last_tx >= 100) {
+        if (now - last_tx >= 1000) {
 
-            TxHeader.DLC = 4;
+            //TxHeader.DLC = 4;
             TxHeader.ExtId = 0;
             TxHeader.IDE = CAN_ID_STD;
-            TxHeader.RTR = CAN_RTR_DATA;
+            TxHeader.RTR = CAN_RTR_REMOTE;
             TxHeader.StdId = CAN_ID_NOW;
+            //TxHeader.TransmitGlobalTime = DISABLE;
+
+            if (HAL_CAN_AddTxMessage(&hcan2, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK)
+            {
+                Error_Handler();
+            }
+
+            TxHeader.StdId = CAN_ID_RND;
             //TxHeader.TransmitGlobalTime = DISABLE;
 
             if (HAL_CAN_AddTxMessage(&hcan2, &TxHeader, (uint8_t *)&now, &TxMailbox) != HAL_OK)
