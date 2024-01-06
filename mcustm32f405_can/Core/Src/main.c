@@ -32,9 +32,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-
 // Define some IDs to use on the CAN bus
-
 #define CAN_ID_NOW 0b11000000000
 #define CAN_ID_RND 0b10000000000
 
@@ -64,6 +62,7 @@ uint8_t TxData[8];
 uint8_t RxData[8];
 
 uint32_t msg_count = 0;
+uint16_t delay = 500;
 
 /* USER CODE END PV */
 
@@ -127,7 +126,7 @@ void HAL_CAN_TxMailbox2AbortCallback(CAN_HandleTypeDef *hcan)
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-    DBG("HAL_CAN_RxFifo0MsgPendingCallback");
+    //DBG("HAL_CAN_RxFifo0MsgPendingCallback");
 
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
         Error_Handler();
@@ -183,8 +182,9 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
             } else if (RxHeader.StdId == CAN_ID_RND) {
 
                 uint32_t *rnd = (uint32_t*) &RxData[0];
+                delay = (uint16_t) *rnd % 1000;
 
-                DBG("CAN2 Got RND data!  rnd = 0x%08lx", *rnd);
+                DBG("CAN2 Got RND data!  rnd = 0x%08lx new delay = %u", *rnd, 500 + delay);
 
             } else {
                 DBG("CAN2 Unknown ID");
@@ -340,7 +340,7 @@ int main(void)
 
         now = HAL_GetTick();
 
-        if (now - last_now >= 999) {
+        if (now - last_now >= 1000) {
 
             //TxHeader.DLC = 4;
             TxHeader.ExtId = 0;
@@ -357,7 +357,7 @@ int main(void)
             last_now = now;
         }
 
-        if (now - last_rnd >= 1001) {
+        if (now - last_rnd >= (500 + delay)) {
             //TxHeader.DLC = 4;
             TxHeader.ExtId = 0;
             TxHeader.IDE = CAN_ID_STD;
