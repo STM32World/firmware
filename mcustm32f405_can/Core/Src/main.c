@@ -94,38 +94,32 @@ int _write(int fd, char *ptr, int len) {
     return -1;
 }
 
-void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_TxMailbox0CompleteCallback");
 }
 
-void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_TxMailbox1CompleteCallback");
 }
 
-void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_TxMailbox2CompleteCallback");
 }
 
-void HAL_CAN_TxMailbox0AbortCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_TxMailbox0AbortCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_TxMailbox0AbortCallback");
 }
 
-void HAL_CAN_TxMailbox1AbortCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_TxMailbox1AbortCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_TxMailbox1AbortCallback");
 }
 
-void HAL_CAN_TxMailbox2AbortCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_TxMailbox2AbortCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_TxMailbox2AbortCallback");
 }
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
+
     //DBG("HAL_CAN_RxFifo0MsgPendingCallback");
 
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
@@ -137,7 +131,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 
                 DBG("CAN1 got NOW request");
 
-                uint32_t now = HAL_GetTick();
+                uint32_t now = HAL_GetTick() / 1000;
 
                 TxHeader.DLC = 4;
                 TxHeader.ExtId = 0;
@@ -194,39 +188,30 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
         DBG("Unknown CAN Instance");
     }
 
-//    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK) {
-//        DBG("Got message %lu - id = 0x%04lx len = 0x%lx, data=%02x%02x%02x%02x%02x%02x%02x%02x", msg_count + 1, RxHeader.StdId, RxHeader.DLC, RxData[0], RxData[1], RxData[2], RxData[3], RxData[4], RxData[5], RxData[6], RxData[7]);
-//    }
     msg_count++;
 }
 
-void HAL_CAN_RxFifo0FullCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_RxFifo0FullCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_RxFifo0FullCallback");
 }
 
-void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_RxFifo1MsgPendingCallback");
 }
 
-void HAL_CAN_RxFifo1FullCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_RxFifo1FullCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_RxFifo1FullCallback");
 }
 
-void HAL_CAN_SleepCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_SleepCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_SleepCallback");
 }
 
-void HAL_CAN_WakeUpFromRxMsgCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_WakeUpFromRxMsgCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_WakeUpFromRxMsgCallback");
 }
 
-void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
-{
+void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan) {
     DBG("HAL_CAN_ErrorCallback");
 }
 
@@ -236,8 +221,7 @@ void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
  * @brief  The application entry point.
  * @retval int
  */
-int main(void)
-{
+int main(void) {
     /* USER CODE BEGIN 1 */
 
     /* USER CODE END 1 */
