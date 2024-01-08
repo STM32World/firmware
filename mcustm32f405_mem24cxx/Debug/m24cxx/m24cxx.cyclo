@@ -1,6 +1,0 @@
-../m24cxx/m24cxx.c:34:22:i2c_wait	3
-../m24cxx/m24cxx.c:78:22:m24cxx_isconnected	2
-../m24cxx/m24cxx.c:55:22:m24cxx_init	2
-../m24cxx/m24cxx.c:96:22:m24cxx_read	6
-../m24cxx/m24cxx.c:140:22:m24cxx_write	7
-../m24cxx/m24cxx.c:195:22:m24cxx_erase_all	3
