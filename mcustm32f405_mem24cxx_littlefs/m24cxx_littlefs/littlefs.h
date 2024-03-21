@@ -19,7 +19,7 @@ extern lfs_t littlefs;
 
 int littlefs_init(M24CXX_HandleTypeDef *m24cxx_init, void *key);
 
-lfs_ssize_t littlefs_size();
-lfs_ssize_t littlefs_free();
+lfs_ssize_t littlefs_size(const struct lfs_config *c);
+lfs_ssize_t littlefs_du(const struct lfs_config *c);
 
 #endif /* INC_LITTLEFS_H_ */

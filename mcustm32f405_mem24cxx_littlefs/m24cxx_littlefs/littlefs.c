@@ -21,8 +21,8 @@ int littlefs_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, 
 int littlefs_erase(const struct lfs_config *c, lfs_block_t block);
 int littlefs_sync(const struct lfs_config *c);
 
-//const struct lfs_config littlefs_config = {
-struct lfs_config littlefs_config = {
+const struct lfs_config littlefs_config = {
+//struct lfs_config littlefs_config = {
     // block device operations
     .read  = littlefs_read,
     .prog  = littlefs_prog,
@@ -40,6 +40,7 @@ struct lfs_config littlefs_config = {
 };
 
 uint8_t *encryption_key = NULL;
+
 M24CXX_HandleTypeDef *m24cxx_handle = NULL;
 
 // variables used by the filesystem
@@ -59,6 +60,8 @@ int littlefs_init(M24CXX_HandleTypeDef *m24cxx_init, void *key) {
 
     int err = lfs_mount(&littlefs, &littlefs_config);
 
+    //err = 1;
+
     // reformat if we can't mount the filesystem
     // this should only happen on the first boot
     if (err) {
@@ -66,7 +69,7 @@ int littlefs_init(M24CXX_HandleTypeDef *m24cxx_init, void *key) {
         lfs_mount(&littlefs, &littlefs_config);
     }
 
-    fs_init(&littlefs_config);
+    //fs_init(&littlefs_config);
 
     return 0;
 
@@ -75,15 +78,13 @@ int littlefs_init(M24CXX_HandleTypeDef *m24cxx_init, void *key) {
 int littlefs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, void *buffer, lfs_size_t size) {
     LFS_DBG("LittleFS Read b = 0x%04lx o = 0x%04lx s = 0x%04lx", block, off, size);
 
-    uint8_t *buf = buffer;
+    uint8_t buf[size];
 
-    if (m24cxx_read(m24cxx_handle, block * littlefs_config.block_size + off, buffer, size) != M24CXX_Ok)
+    if (m24cxx_read(m24cxx_handle, block * littlefs_config.block_size + off, (void *)&buf, size) != M24CXX_Ok)
         return -1;
 
-    if (encryption_key) {
-        for (uint32_t i = 0; i < size; ++i) {
-            buf[i] = buf[i] ^ encryption_key[off + i];
-        }
+    for (uint32_t i = 0; i < size; ++i) {
+        ((uint8_t *)buffer)[i] = encryption_key ? buf[i] ^ encryption_key[off + i] : buf[i];
     }
 
     return 0;
@@ -92,15 +93,13 @@ int littlefs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, 
 int littlefs_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, const void *buffer, lfs_size_t size) {
     LFS_DBG("LittleFS Prog b = 0x%04lx o = 0x%04lx s = 0x%04lx", block, off, size);
 
-    uint8_t *buf = (uint8_t *)buffer;
+    uint8_t buf[size];
 
-    if (encryption_key) {
-        for (uint32_t i = 0; i < size; ++i) {
-            buf[i] = buf[i] ^ encryption_key[off + i];
-        }
+    for (uint32_t i = 0; i < size; ++i) {
+        buf[i] = encryption_key ? ((uint8_t *)buffer)[i] ^ encryption_key[off + i] : ((uint8_t *)buffer)[i];
     }
 
-    if (m24cxx_write(m24cxx_handle, block * littlefs_config.block_size + off, (void*) buffer, size) != M24CXX_Ok)
+    if (m24cxx_write(m24cxx_handle, block * littlefs_config.block_size + off, (void *)&buf, size) != M24CXX_Ok)
         return -1;
 
     return 0;
@@ -128,4 +127,13 @@ int littlefs_erase(const struct lfs_config *c, lfs_block_t block) {
 int littlefs_sync(const struct lfs_config *c) {
     LFS_DBG("LittleFS Sync");
     return 0;
+}
+
+lfs_ssize_t littlefs_size(const struct lfs_config *c) {
+    return littlefs.cfg->block_size * littlefs.cfg->block_count;
+    //return c->block_size * c->block_count;
+}
+
+lfs_ssize_t littlefs_du(const struct lfs_config *c) {
+    return lfs_fs_size(&littlefs);
 }

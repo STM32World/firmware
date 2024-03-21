@@ -61,11 +61,13 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
+#define WP_Pin GPIO_PIN_15
+#define WP_GPIO_Port GPIOC
 
 /* USER CODE BEGIN Private defines */
 
 #ifdef DEBUG
-#define DBG(...)    fprintf(stderr, __VA_ARGS__)
+#define DBG(...)    fprintf(stdout, __VA_ARGS__)
 #else
 #define DBG(...)
 #endif

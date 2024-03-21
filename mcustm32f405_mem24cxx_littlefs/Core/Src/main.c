@@ -52,6 +52,10 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 M24CXX_HandleTypeDef m24cxx;
+uint8_t buffer[112 * 1024] = {0}; // buffer to write and read
+uint8_t key[256] = {0}; // key used for encryption
+lfs_file_t file;
+uint32_t start_time;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -85,6 +89,78 @@ int _write(int fd, char *ptr, int len) {
         return len;
     }
     return -1;
+}
+
+int lfs_ls(lfs_t *lfs, const char *path) {
+    lfs_dir_t dir;
+    int err = lfs_dir_open(lfs, &dir, path);
+    if (err) {
+        return err;
+    }
+
+    struct lfs_info info;
+    while (true) {
+        int res = lfs_dir_read(lfs, &dir, &info);
+        if (res < 0) {
+            return res;
+        }
+
+        if (res == 0) {
+            break;
+        }
+
+        switch (info.type) {
+        case LFS_TYPE_REG:
+            printf("reg ");
+            break;
+        case LFS_TYPE_DIR:
+            printf("dir ");
+            break;
+        default:
+            printf("?   ");
+            break;
+        }
+
+        static const char *prefixes[] = { "", "K", "M", "G" };
+        for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
+            if (info.size >= (1 << 10 * i) - 1) {
+                printf("%*lu %s ", 4 - (i != 0), info.size >> 10 * i, prefixes[i]);
+                break;
+            }
+        }
+
+        printf("%s\n", info.name);
+    }
+
+    err = lfs_dir_close(lfs, &dir);
+    if (err) {
+        return err;
+    }
+
+    return 0;
+}
+
+void clear_buffer(uint8_t *d, uint32_t s) {
+    memset(d, 0, s);
+}
+
+void show_hex(uint8_t *data, int len) {
+
+    static const int line_len = 16;
+
+    for (int i = 0; i < len; ++i) {
+
+        if (i % line_len == 0) {
+            printf("%08x: ", i);
+        }
+
+        printf("%02x ", data[i]);
+
+        if ((i + 1) % line_len == 0) {
+            printf("\n");
+        }
+
+    }
 }
 
 /* USER CODE END 0 */
@@ -123,7 +199,12 @@ int main(void)
   MX_RNG_Init();
   /* USER CODE BEGIN 2 */
 
-    DBG("\n\n\n\nStarting\n");
+    DBG("\n\n\n\nStarting 24M01 test\n");
+
+    HAL_Delay(10);
+
+    DBG("Yank WP low to allow write\n");
+    HAL_GPIO_WritePin(WP_GPIO_Port, WP_Pin, GPIO_PIN_RESET);
 
     // Wait a few ms to get ready
     HAL_Delay(10);
@@ -146,12 +227,141 @@ int main(void)
 
     DBG("\n");
 
-    DBG("Initializing %s - %u kB EEPROM", M24CXX_TYPE, M24CXX_SIZE / 1024);
+    DBG("Initializing %s - %u kB EEPROM\n", M24CXX_TYPE, M24CXX_SIZE / 1024);
 
     if (m24cxx_init(&m24cxx, &hi2c1, 0x50) != M24CXX_Ok) {
         DBG("M24CXX Failed to initialize");
         Error_Handler();
     }
+
+//    DBG("Erasing EEPROM\n");
+//    m24cxx_erase_all(&m24cxx);
+
+    for (int i = 0; i < sizeof(key); ++i) {
+        key[i] = (uint8_t)i;
+    }
+
+    if (littlefs_init(&m24cxx, &key) != 0) {
+        DBG("Littlefs Init Error");
+        Error_Handler();
+    }
+
+    //DBG("Using buffer: \n");
+    //show_hex((uint8_t *)&buffer, sizeof(buffer));
+
+    lfs_remove(&littlefs, "buffer");
+
+    DBG("Buffer is %u bytes\n", sizeof(buffer));
+
+    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+
+    DBG("Writing file\n");
+    start_time = HAL_GetTick();
+    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
+
+    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
+
+    // remember the storage is not updated until the file is closed successfully
+    lfs_file_close(&littlefs, &file);
+    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
+
+    clear_buffer((uint8_t *)&buffer, sizeof(buffer));
+
+    DBG("Reading file\n");
+    start_time = HAL_GetTick();
+    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
+
+    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
+    lfs_file_close(&littlefs, &file);
+    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
+
+    //DBG("Buffer is now:\n");
+    //show_hex((uint8_t *)&buffer, sizeof(buffer));
+    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+
+    HAL_Delay(1000);
+
+    lfs_remove(&littlefs, "buffer");
+
+    //DBG("Modifying buffer:\n");
+    for (int i = 0; i < sizeof(buffer); ++i) {
+        buffer[i] = (uint8_t)i;
+    }
+    //show_hex((uint8_t *)&buffer, sizeof(buffer));
+
+    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+
+    DBG("Writing file\n");
+    start_time = HAL_GetTick();
+    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
+
+    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
+
+    // remember the storage is not updated until the file is closed successfully
+    lfs_file_close(&littlefs, &file);
+    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
+
+    clear_buffer(&buffer, sizeof(buffer));
+
+    DBG("Reading file\n");
+    start_time = HAL_GetTick();
+    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
+
+    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
+    lfs_file_close(&littlefs, &file);
+    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
+
+//    DBG("Buffer is now:\n");
+//    show_hex((uint8_t *)&buffer, sizeof(buffer));
+    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+
+    HAL_Delay(1000);
+
+    lfs_remove(&littlefs, "buffer");
+
+    DBG("Modifying buffer:\n");
+    for (int i = 0; i < sizeof(buffer); ++i) {
+        buffer[i] = 0xff;
+    }
+//    show_hex((uint8_t *)&buffer, sizeof(buffer));
+
+    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+
+    DBG("Writing file\n");
+    start_time = HAL_GetTick();
+    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
+
+    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
+
+    // remember the storage is not updated until the file is closed successfully
+    lfs_file_close(&littlefs, &file);
+
+    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
+
+    clear_buffer(&buffer, sizeof(buffer));
+
+    DBG("Reading file\n");
+    start_time = HAL_GetTick();
+    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
+
+    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
+    lfs_file_close(&littlefs, &file);
+
+//    DBG("Buffer is now:\n");
+//    show_hex((uint8_t *)&buffer, sizeof(buffer));
+
+    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
+
+    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+
+    HAL_Delay(1000);
+
+    DBG("Files:\n");
+    lfs_ls(&littlefs, "/");
+
+    DBG("LittleFS Size: %lu", littlefs_size(&littlefs));
+
+    //DBG("Littlefs report size = %lu, use = %lu", littlefs_size(&littlefs), littlefs_du(&littlefs));
 
   /* USER CODE END 2 */
 
@@ -360,7 +570,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, LED_Pin|WP_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : LED_Pin */
   GPIO_InitStruct.Pin = LED_Pin;
@@ -368,6 +578,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : WP_Pin */
+  GPIO_InitStruct.Pin = WP_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(WP_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
