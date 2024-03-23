@@ -129,11 +129,11 @@ int littlefs_sync(const struct lfs_config *c) {
     return 0;
 }
 
-lfs_ssize_t littlefs_size(const struct lfs_config *c) {
+lfs_ssize_t littlefs_size() {
     return littlefs.cfg->block_size * littlefs.cfg->block_count;
     //return c->block_size * c->block_count;
 }
 
-lfs_ssize_t littlefs_du(const struct lfs_config *c) {
-    return lfs_fs_size(&littlefs);
+lfs_ssize_t littlefs_du() {
+    return lfs_fs_size(&littlefs) * littlefs.cfg->block_size;
 }

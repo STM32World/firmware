@@ -33,7 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define FILES_COUNT 10
+#define FILE_SIZE 1024
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,9 +53,9 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 M24CXX_HandleTypeDef m24cxx;
-uint8_t buffer[112 * 1024] = {0}; // buffer to write and read
+uint8_t buffer[FILE_SIZE] = {0}; // buffer to write and read
 uint8_t key[256] = {0}; // key used for encryption
-lfs_file_t file;
+char file_names[FILES_COUNT][8];
 uint32_t start_time;
 /* USER CODE END PV */
 
@@ -163,6 +164,61 @@ void show_hex(uint8_t *data, int len) {
     }
 }
 
+void delete_all_files() {
+
+    lfs_dir_t dir;
+    struct lfs_info info;
+
+    DBG("Deleting all files\n");
+
+    int err = lfs_dir_open(&littlefs, &dir, "/");
+    if (err) {
+        Error_Handler();
+    }
+
+    while (lfs_dir_read(&littlefs, &dir, &info)) {
+        if (info.type == LFS_TYPE_REG) {
+            DBG("Removing regular file '%s'\n", info.name);
+            lfs_remove(&littlefs, info.name);
+        }
+    }
+
+    DBG("Done deleting files\n");
+
+}
+
+void generate_file_names() {
+    for (int i = 0; i < FILES_COUNT; ++i) {
+        sprintf(file_names[i], "data%03d", i);
+    }
+}
+
+void do_files() {
+
+    lfs_file_t file;
+    uint32_t write_crc = HAL_CRC_Calculate(&hcrc, NULL, 0);
+    uint32_t start_time;
+
+    // Create all files
+    for (int i = 0; i < FILES_COUNT; ++i) {
+        write_crc = HAL_CRC_Accumulate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4);
+
+        DBG("Writing file %s\n", file_names[i]);
+        start_time = HAL_GetTick();
+        lfs_file_open(&littlefs, &file, file_names[i], LFS_O_RDWR | LFS_O_CREAT);
+
+        lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
+
+        // remember the storage is not updated until the file is closed successfully
+        lfs_file_close(&littlefs, &file);
+        DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
+
+    }
+
+    DBG("Write CRC = 0x%08lx\n", write_crc);
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -241,127 +297,133 @@ int main(void)
         key[i] = (uint8_t)i;
     }
 
+    DBG("Initializing littlefs\n");
+
     if (littlefs_init(&m24cxx, &key) != 0) {
         DBG("Littlefs Init Error");
         Error_Handler();
     }
 
-    //DBG("Using buffer: \n");
-    //show_hex((uint8_t *)&buffer, sizeof(buffer));
+    delete_all_files();
 
-    lfs_remove(&littlefs, "buffer");
+    generate_file_names();
 
-    DBG("Buffer is %u bytes\n", sizeof(buffer));
+    do_files();
 
-    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
-
-    DBG("Writing file\n");
-    start_time = HAL_GetTick();
-    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
-
-    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
-
-    // remember the storage is not updated until the file is closed successfully
-    lfs_file_close(&littlefs, &file);
-    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
-
-    clear_buffer((uint8_t *)&buffer, sizeof(buffer));
-
-    DBG("Reading file\n");
-    start_time = HAL_GetTick();
-    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
-
-    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
-    lfs_file_close(&littlefs, &file);
-    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
-
-    //DBG("Buffer is now:\n");
-    //show_hex((uint8_t *)&buffer, sizeof(buffer));
-    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
-
-    HAL_Delay(1000);
-
-    lfs_remove(&littlefs, "buffer");
-
-    //DBG("Modifying buffer:\n");
-    for (int i = 0; i < sizeof(buffer); ++i) {
-        buffer[i] = (uint8_t)i;
-    }
-    //show_hex((uint8_t *)&buffer, sizeof(buffer));
-
-    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
-
-    DBG("Writing file\n");
-    start_time = HAL_GetTick();
-    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
-
-    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
-
-    // remember the storage is not updated until the file is closed successfully
-    lfs_file_close(&littlefs, &file);
-    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
-
-    clear_buffer(&buffer, sizeof(buffer));
-
-    DBG("Reading file\n");
-    start_time = HAL_GetTick();
-    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
-
-    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
-    lfs_file_close(&littlefs, &file);
-    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
-
-//    DBG("Buffer is now:\n");
-//    show_hex((uint8_t *)&buffer, sizeof(buffer));
-    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
-
-    HAL_Delay(1000);
-
-    lfs_remove(&littlefs, "buffer");
-
-    DBG("Modifying buffer:\n");
-    for (int i = 0; i < sizeof(buffer); ++i) {
-        buffer[i] = 0xff;
-    }
-//    show_hex((uint8_t *)&buffer, sizeof(buffer));
-
-    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
-
-    DBG("Writing file\n");
-    start_time = HAL_GetTick();
-    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
-
-    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
-
-    // remember the storage is not updated until the file is closed successfully
-    lfs_file_close(&littlefs, &file);
-
-    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
-
-    clear_buffer(&buffer, sizeof(buffer));
-
-    DBG("Reading file\n");
-    start_time = HAL_GetTick();
-    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
-
-    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
-    lfs_file_close(&littlefs, &file);
-
-//    DBG("Buffer is now:\n");
-//    show_hex((uint8_t *)&buffer, sizeof(buffer));
-
-    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
-
-    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
-
-    HAL_Delay(1000);
+//    //DBG("Using buffer: \n");
+//    //show_hex((uint8_t *)&buffer, sizeof(buffer));
+//
+//    lfs_remove(&littlefs, "buffer");
+//
+//    DBG("Buffer is %u bytes\n", sizeof(buffer));
+//
+//    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+//
+//    DBG("Writing file\n");
+//    start_time = HAL_GetTick();
+//    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
+//
+//    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
+//
+//    // remember the storage is not updated until the file is closed successfully
+//    lfs_file_close(&littlefs, &file);
+//    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
+//
+//    clear_buffer((uint8_t *)&buffer, sizeof(buffer));
+//
+//    DBG("Reading file\n");
+//    start_time = HAL_GetTick();
+//    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
+//
+//    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
+//    lfs_file_close(&littlefs, &file);
+//    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
+//
+//    //DBG("Buffer is now:\n");
+//    //show_hex((uint8_t *)&buffer, sizeof(buffer));
+//    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+//
+//    HAL_Delay(1000);
+//
+//    lfs_remove(&littlefs, "buffer");
+//
+//    //DBG("Modifying buffer:\n");
+//    for (int i = 0; i < sizeof(buffer); ++i) {
+//        buffer[i] = (uint8_t)i;
+//    }
+//    //show_hex((uint8_t *)&buffer, sizeof(buffer));
+//
+//    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+//
+//    DBG("Writing file\n");
+//    start_time = HAL_GetTick();
+//    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
+//
+//    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
+//
+//    // remember the storage is not updated until the file is closed successfully
+//    lfs_file_close(&littlefs, &file);
+//    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
+//
+//    clear_buffer((uint8_t *)&buffer, sizeof(buffer));
+//
+//    DBG("Reading file\n");
+//    start_time = HAL_GetTick();
+//    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
+//
+//    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
+//    lfs_file_close(&littlefs, &file);
+//    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
+//
+////    DBG("Buffer is now:\n");
+////    show_hex((uint8_t *)&buffer, sizeof(buffer));
+//    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+//
+//    HAL_Delay(1000);
+//
+//    lfs_remove(&littlefs, "buffer");
+//
+//    DBG("Modifying buffer:\n");
+//    for (int i = 0; i < sizeof(buffer); ++i) {
+//        buffer[i] = 0xff;
+//    }
+////    show_hex((uint8_t *)&buffer, sizeof(buffer));
+//
+//    DBG("Buffer CRC before: 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+//
+//    DBG("Writing file\n");
+//    start_time = HAL_GetTick();
+//    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR | LFS_O_CREAT);
+//
+//    lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
+//
+//    // remember the storage is not updated until the file is closed successfully
+//    lfs_file_close(&littlefs, &file);
+//
+//    DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
+//
+//    clear_buffer((uint8_t *)&buffer, sizeof(buffer));
+//
+//    DBG("Reading file\n");
+//    start_time = HAL_GetTick();
+//    lfs_file_open(&littlefs, &file, "buffer", LFS_O_RDWR);
+//
+//    lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
+//    lfs_file_close(&littlefs, &file);
+//
+////    DBG("Buffer is now:\n");
+////    show_hex((uint8_t *)&buffer, sizeof(buffer));
+//
+//    DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
+//
+//    DBG("Buffer CRC after : 0x%08lx\n", HAL_CRC_Calculate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4));
+//
+//    HAL_Delay(1000);
 
     DBG("Files:\n");
     lfs_ls(&littlefs, "/");
 
-    DBG("LittleFS Size: %lu", littlefs_size(&littlefs));
-
-    //DBG("Littlefs report size = %lu, use = %lu", littlefs_size(&littlefs), littlefs_du(&littlefs));
+    DBG("Littlefs report size = %lu, use = %lu\n", littlefs_size(), littlefs_du());
 
   /* USER CODE END 2 */
 
