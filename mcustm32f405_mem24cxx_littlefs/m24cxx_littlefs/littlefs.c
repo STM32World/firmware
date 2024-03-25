@@ -33,10 +33,10 @@ const struct lfs_config littlefs_config = {
     .read_size = 16,
     .prog_size = 16,
     .block_size = 256,
-    .block_count = 512,
+    .block_count = 4 * 512,
     .cache_size = 16,
     .lookahead_size = 16,
-    .block_cycles = 1000,
+    .block_cycles = 100,
 };
 
 uint8_t *encryption_key = NULL;
