@@ -33,8 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define FILES_COUNT 82
-#define FILE_SIZE 4 * 1024
+#define FILES_COUNT 112
+#define FILE_SIZE 4 * 1000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -55,7 +55,7 @@ UART_HandleTypeDef huart1;
 M24CXX_HandleTypeDef m24cxx;
 uint8_t buffer[FILE_SIZE] = {0}; // buffer to write and read
 uint8_t key[256] = {0}; // key used for encryption
-char file_names[FILES_COUNT][8];
+char file_names[FILES_COUNT][13];
 uint32_t start_time;
 lfs_file_t file;
 /* USER CODE END PV */
@@ -123,13 +123,15 @@ int lfs_ls(lfs_t *lfs, const char *path) {
             break;
         }
 
-        static const char *prefixes[] = { "", "K", "M", "G" };
-        for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
-            if (info.size >= (1 << 10 * i) - 1) {
-                printf("%*lu %s ", 4 - (i != 0), info.size >> 10 * i, prefixes[i]);
-                break;
-            }
-        }
+        printf("%8lu B ", info.size);
+
+//        static const char *prefixes[] = { "", "K", "M", "G" };
+//        for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
+//            if (info.size >= (1 << 10 * i) - 1) {
+//                printf("%*lu %s ", 4 - (i != 0), info.size >> 10 * i, prefixes[i]);
+//                break;
+//            }
+//        }
 
         printf("%s\n", info.name);
     }
@@ -192,7 +194,7 @@ void delete_all_files() {
 
 void generate_file_names() {
     for (int i = 0; i < FILES_COUNT; ++i) {
-        sprintf(file_names[i], "data%03d", i);
+        sprintf(file_names[i], "data%03d.dat", i);
     }
 }
 
@@ -225,7 +227,7 @@ void do_files() {
 
         DBG("Reading file %s\n", file_names[i]);
         start_time = HAL_GetTick();
-        lfs_file_open(&littlefs, &file, file_names[i], LFS_O_RDWR | LFS_O_CREAT);
+        lfs_file_open(&littlefs, &file, file_names[i], LFS_O_RDONLY);
         lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
         lfs_file_close(&littlefs, &file);
         DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
@@ -328,6 +330,8 @@ int main(void)
     generate_file_names();
 
     do_files();
+
+    HAL_Delay(1000);
 
 //    //DBG("Using buffer: \n");
 //    //show_hex((uint8_t *)&buffer, sizeof(buffer));
