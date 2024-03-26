@@ -207,7 +207,7 @@ void do_files() {
     for (int i = 0; i < FILES_COUNT; ++i) {
         write_crc = HAL_CRC_Accumulate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4);
 
-        DBG("Writing file %s\n", file_names[i]);
+        DBG("Writing file %s ", file_names[i]);
         start_time = HAL_GetTick();
         lfs_file_open(&littlefs, &file, file_names[i], LFS_O_RDWR | LFS_O_CREAT);
 
@@ -215,7 +215,7 @@ void do_files() {
 
         // remember the storage is not updated until the file is closed successfully
         lfs_file_close(&littlefs, &file);
-        DBG("Writing took %lu ms\n", HAL_GetTick() - start_time);
+        DBG("(%lu ms)\n", HAL_GetTick() - start_time);
 
     }
 
@@ -225,12 +225,12 @@ void do_files() {
     for (int i = 0; i < FILES_COUNT; ++i) {
         //write_crc = HAL_CRC_Accumulate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4);
 
-        DBG("Reading file %s\n", file_names[i]);
+        DBG("Reading file %s ", file_names[i]);
         start_time = HAL_GetTick();
         lfs_file_open(&littlefs, &file, file_names[i], LFS_O_RDONLY);
         lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
         lfs_file_close(&littlefs, &file);
-        DBG("Reading took %lu ms\n", HAL_GetTick() - start_time);
+        DBG("(%lu) ms\n", HAL_GetTick() - start_time);
 
         read_crc = HAL_CRC_Accumulate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4);
 
