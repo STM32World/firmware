@@ -125,14 +125,6 @@ int lfs_ls(lfs_t *lfs, const char *path) {
 
         printf("%8lu B ", info.size);
 
-//        static const char *prefixes[] = { "", "K", "M", "G" };
-//        for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
-//            if (info.size >= (1 << 10 * i) - 1) {
-//                printf("%*lu %s ", 4 - (i != 0), info.size >> 10 * i, prefixes[i]);
-//                break;
-//            }
-//        }
-
         printf("%s\n", info.name);
     }
 
@@ -211,11 +203,11 @@ void do_files() {
         start_time = HAL_GetTick();
         lfs_file_open(&littlefs, &file, file_names[i], LFS_O_RDWR | LFS_O_CREAT);
 
-        lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
+        uint32_t bytes_written = lfs_file_write(&littlefs, &file, &buffer, sizeof(buffer));
 
         // remember the storage is not updated until the file is closed successfully
         lfs_file_close(&littlefs, &file);
-        DBG("(%lu ms)\n", HAL_GetTick() - start_time);
+        DBG("(%lu bytes in %lu ms)\n", bytes_written, HAL_GetTick() - start_time);
 
     }
 
@@ -223,14 +215,15 @@ void do_files() {
 
     // Now read all the files
     for (int i = 0; i < FILES_COUNT; ++i) {
-        //write_crc = HAL_CRC_Accumulate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4);
+
+        clear_buffer((uint8_t *)&buffer, sizeof(buffer));
 
         DBG("Reading file %s ", file_names[i]);
         start_time = HAL_GetTick();
         lfs_file_open(&littlefs, &file, file_names[i], LFS_O_RDONLY);
-        lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
+        uint32_t bytes_read = lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
         lfs_file_close(&littlefs, &file);
-        DBG("(%lu) ms\n", HAL_GetTick() - start_time);
+        DBG("(%lu bytes in %lu) ms\n", bytes_read, HAL_GetTick() - start_time);
 
         read_crc = HAL_CRC_Accumulate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4);
 
@@ -291,10 +284,9 @@ int main(void)
     for (uint8_t i = 0; i < 128; i++) {
 
         if (HAL_I2C_IsDeviceReady(&hi2c1, (uint16_t) (i << 1), 3, 100) == HAL_OK) {
-            // We got an ack
-            DBG("%2x ", i);
+            DBG("%2x ", i); // We got an ack
         } else {
-            DBG("-- ");
+            DBG("-- "); // No ack
         }
 
         if (i > 0 && (i + 1) % 16 == 0)

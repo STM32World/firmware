@@ -1,8 +1,18 @@
-/*
- * littlefs.h
+/**
+ ******************************************************************************
+ * @file           : littlefs.h
+ * @brief          : Littlefs m24cxx driver header
+ ******************************************************************************
+ * @attention
  *
- *  Created on: Mar 3, 2022
- *      Author: lth
+ * Copyright (c) 2024 Lars Boegild Thomsen <lth@stm32world.com>.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
  */
 
 #ifndef INC_LITTLEFS_H_

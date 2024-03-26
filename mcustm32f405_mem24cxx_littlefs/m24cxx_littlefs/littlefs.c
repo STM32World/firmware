@@ -1,15 +1,23 @@
-/*
- * littlefs.c
+/**
+ ******************************************************************************
+ * @file           : littlefs.c
+ * @brief          : Littlefs m24cxx driver
+ ******************************************************************************
+ * @attention
  *
- *  Created on: Mar 3, 2022
- *      Author: lth
+ * Copyright (c) 2024 Lars Boegild Thomsen <lth@stm32world.com>.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
  */
 
 #include "main.h"
 #include "stdio.h"
 #include "string.h"
-//#include "fatfs.h"
-//#include "fs.h"
 #include "lfs.h"
 #include "m24cxx.h"
 #include "littlefs.h"
@@ -22,7 +30,6 @@ int littlefs_erase(const struct lfs_config *c, lfs_block_t block);
 int littlefs_sync(const struct lfs_config *c);
 
 const struct lfs_config littlefs_config = {
-//struct lfs_config littlefs_config = {
     // block device operations
     .read  = littlefs_read,
     .prog  = littlefs_prog,
@@ -45,7 +52,6 @@ M24CXX_HandleTypeDef *m24cxx_handle = NULL;
 
 // variables used by the filesystem
 lfs_t littlefs;
-//lfs_file_t file;
 
 int littlefs_init(M24CXX_HandleTypeDef *m24cxx_init, void *key) {
     LFS_DBG("LittleFS Init");
@@ -68,8 +74,6 @@ int littlefs_init(M24CXX_HandleTypeDef *m24cxx_init, void *key) {
         lfs_format(&littlefs, &littlefs_config);
         lfs_mount(&littlefs, &littlefs_config);
     }
-
-    //fs_init(&littlefs_config);
 
     return 0;
 
@@ -131,7 +135,6 @@ int littlefs_sync(const struct lfs_config *c) {
 
 lfs_ssize_t littlefs_size() {
     return littlefs.cfg->block_size * littlefs.cfg->block_count;
-    //return c->block_size * c->block_count;
 }
 
 lfs_ssize_t littlefs_du() {
