@@ -223,7 +223,7 @@ void do_files() {
         lfs_file_open(&littlefs, &file, file_names[i], LFS_O_RDONLY);
         uint32_t bytes_read = lfs_file_read(&littlefs, &file, &buffer, sizeof(buffer));
         lfs_file_close(&littlefs, &file);
-        DBG("(%lu bytes in %lu) ms\n", bytes_read, HAL_GetTick() - start_time);
+        DBG("(%lu bytes in %lu ms)\n", bytes_read, HAL_GetTick() - start_time);
 
         read_crc = HAL_CRC_Accumulate(&hcrc, (uint32_t *)&buffer, sizeof(buffer) / 4);
 
