@@ -6,7 +6,7 @@
  ******************************************************************************
  * @attention
  *
- * Copyright (c) 2024 STMicroelectronics.
+ * Copyright (c) 2024 Lars Boegild Thomsen <lth@stm32world.com>.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -194,7 +194,7 @@ void delete_all_files() {
 
 void generate_file_names() {
     for (int i = 0; i < FILES_COUNT; ++i) {
-        sprintf(file_names[i], "data%03d.dat", i);
+        sprintf(file_names[i], "file%03d.dat", i);
     }
 }
 
