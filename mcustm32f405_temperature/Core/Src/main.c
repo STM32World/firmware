@@ -58,6 +58,9 @@ uint16_t temp_avg = 0;
 float vdda = 0; // Result of VDDA calculation
 float vref = 0; // Result of vref calculation
 float temp = 0; // Result of temp calculation
+//uint32_t vdda = 0; // Result of VDDA calculation
+//uint32_t vref = 0; // Result of vref calculation
+//uint32_t temp = 0; // Result of temp calculation
 
 /* USER CODE END PV */
 
@@ -114,9 +117,10 @@ static inline void process_adc_buffer(uint16_t *buffer) {
 
     // VDDA can be calculated based on the measured vref and the calibration data
     vdda = (float) VREFINT_CAL_VREF * *VREFINT_CAL_ADDR / vref_avg / 1000;
+    //vdda = VREFINT_CAL_VREF * *VREFINT_CAL_ADDR / vref_avg / 1000;
 
     // Knowing vdda and the resolution of adc - the actual voltage can be calculated
-    vref = (float) vdda / ADC_RESOLUTION * vref_avg;
+    vref = (float)( vdda / ADC_RESOLUTION * vref_avg );
     //vref = __LL_ADC_CALC_VREFANALOG_VOLTAGE(vref_avg, ADC_RESOLUTION_12B);
 
 
@@ -197,7 +201,7 @@ int main(void)
         }
 
         if (now - last_tick >= 1000) {
-            DBG("VDDA = %5.3f V Vref = %5.3f V (raw = %d) Temp = %4.2f °C (raw = %d)", vdda, vref, vref_avg, temp, temp_avg);
+            DBG("VDDA = %5.3f V Vref = %5.3f V (raw = %d) Temp = %4.2f °C (raw = %d)", (float)vdda, (float)vref, vref_avg, (float)temp, temp_avg);
             last_tick = now;
         }
 
