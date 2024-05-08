@@ -97,6 +97,8 @@ int _write(int fd, char *ptr, int len) {
 // Callback which runs the PWM
 inline void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
+    static uint32_t last_bsrr = GPIO_BSRR_BS13;
+
     if (htim->Instance == LED_PWM_TIM) {
 
         // Increase the counter - it will roll over automatically every 256 bit
@@ -105,12 +107,20 @@ inline void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         // Switch LED on off or on depending on value of led_pwm_cnt.
         *led_bb_bit = (uint8_t) led_pwm_cnt >= led_pwm_val ? 1 : 0;
 
+        // This should work but does not
 //        LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
 
-//        if (led_pwm_cnt >= led_pwm_val) {
-//            LED_GPIO_Port->BSRR = GPIO_BSRR_BS13;
-//        } else {
-//            LED_GPIO_Port->BSRR = GPIO_BSRR_BR13;
+// Another approach but still doesn't work
+//        if (led_pwm_cnt >= led_pwm_val) { // need to set
+//            if (last_bsrr == GPIO_BSRR_BR13) {
+//                LED_GPIO_Port->BSRR = GPIO_BSRR_BS13;
+//                last_bsrr = GPIO_BSRR_BS13;
+//            }
+//        } else { //.need to reset
+//            if (last_bsrr == GPIO_BSRR_BS13) {
+//                LED_GPIO_Port->BSRR = GPIO_BSRR_BR13;
+//                last_bsrr = GPIO_BSRR_BR13;
+//            }
 //        }
 
     }
