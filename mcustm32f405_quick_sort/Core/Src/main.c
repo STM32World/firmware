@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
- ******************************************************************************
- * @file           : main.c
- * @brief          : Main program body
- ******************************************************************************
- * @attention
- *
- * Copyright (c) 2023 Lars Boegild Thomsen <lth@stm32world.com>
- * All rights reserved.
- *
- * This software is licensed under terms that can be found in the LICENSE file
- * in the root directory of this software component.
- * If no LICENSE file comes with this software, it is provided AS-IS.
- *
- ******************************************************************************
- */
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2024 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -32,6 +32,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define ARRAY_SIZE 32
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -40,15 +42,20 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+RNG_HandleTypeDef hrng;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+
+uint32_t arr[ARRAY_SIZE];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_RNG_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -72,6 +79,74 @@ int _write(int fd, char *ptr, int len) {
     return -1;
 }
 
+void fill_random(void *d, uint32_t s) {
+
+    uint8_t *w = d;
+
+    for (uint32_t i = 0; i < s; i += 4) {
+        if (HAL_RNG_GenerateRandomNumber(&hrng, (uint32_t *)&w[i]) != HAL_OK) {
+            Error_Handler();
+        }
+    }
+
+}
+
+// Function to swap two elements
+void swap(uint32_t* a, uint32_t* b)
+{
+    uint32_t temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+// Partition function
+int partition(uint32_t arr[], uint32_t low, uint32_t high)
+{
+
+    // initialize pivot to be the first element
+    int pivot = arr[low];
+    int i = low;
+    int j = high;
+
+    while (i < j) {
+
+        // condition 1: find the first element greater than
+        // the pivot (from starting)
+        while (arr[i] <= pivot && i <= high - 1) {
+            i++;
+        }
+
+        // condition 2: find the first element smaller than
+        // the pivot (from last)
+        while (arr[j] > pivot && j >= low + 1) {
+            j--;
+        }
+
+        if (i < j) {
+            swap(&arr[i], &arr[j]);
+        }
+    }
+
+    swap(&arr[low], &arr[j]);
+
+    return j;
+}
+
+// QuickSort function
+void quickSort(uint32_t arr[], uint32_t low, uint32_t high)
+{
+    if (low < high) {
+
+        // call Partition function to find Partition Index
+        uint32_t partitionIndex = partition(arr, low, high);
+
+        // Recursively call quickSort() for left and right
+        // half based on partition Index
+        quickSort(arr, low, partitionIndex - 1);
+        quickSort(arr, partitionIndex + 1, high);
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -80,7 +155,6 @@ int _write(int fd, char *ptr, int len) {
   */
 int main(void)
 {
-
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -103,36 +177,24 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_RNG_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
-    DBG("\n\n\n--------\nStarting");
+  fill_random(arr, sizeof(arr));
+
+  quickSort(arr, 0, sizeof(arr) / sizeof(arr[0]) - 1);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-    uint32_t now = 0, last_blink = 0, last_tick = 0;
-
-    while (1) {
-
-        now = HAL_GetTick();
-
-        if (now - last_blink >= 500) {
-            HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-            last_blink = now;
-        }
-
-        if (now - last_tick >= 1000) {
-            DBG("Tick %lu", now / 1000);
-            last_tick = now;
-        }
-
+   while (1)
+  {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    }
+  }
   /* USER CODE END 3 */
 }
 
@@ -160,7 +222,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -179,6 +241,32 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief RNG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RNG_Init(void)
+{
+
+  /* USER CODE BEGIN RNG_Init 0 */
+
+  /* USER CODE END RNG_Init 0 */
+
+  /* USER CODE BEGIN RNG_Init 1 */
+
+  /* USER CODE END RNG_Init 1 */
+  hrng.Instance = RNG;
+  if (HAL_RNG_Init(&hrng) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RNG_Init 2 */
+
+  /* USER CODE END RNG_Init 2 */
+
 }
 
 /**
@@ -256,10 +344,11 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-    /* User can add his own implementation to report the HAL error return state */
-    __disable_irq();
-    while (1) {
-    }
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
   /* USER CODE END Error_Handler_Debug */
 }
 
