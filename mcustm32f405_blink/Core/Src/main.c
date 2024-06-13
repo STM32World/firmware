@@ -80,7 +80,6 @@ int _write(int fd, char *ptr, int len) {
   */
 int main(void)
 {
-
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -107,6 +106,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
     DBG("\n\n\n--------\nStarting");
+
+    DBG("Size of long double : %d", sizeof(long double));
+    DBG("Size of double      : %d", sizeof(double));
+    DBG("Size of float       : %d", sizeof(float));
+    DBG("Size of long long   : %d", sizeof(long long));
+    DBG("Size of long        : %d", sizeof(long));
+    DBG("Size of int         : %d", sizeof(int));
+    DBG("Size of short       : %d", sizeof(short));
+    DBG("Size of char        : %d", sizeof(char));
 
   /* USER CODE END 2 */
 
@@ -229,7 +237,6 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
