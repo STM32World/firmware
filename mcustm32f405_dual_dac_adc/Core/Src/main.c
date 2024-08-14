@@ -1,26 +1,29 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2024 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2024 STM32World <lth@stm32world.com>
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+// Relies on arm's optimised floating point library to get math done quick
+#include "arm_math.h"
 
 /* USER CODE END Includes */
 
@@ -31,7 +34,13 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SAMPLES 10
+#define M_PI2 2 * M_PI // Full Circle
+
+#define SAMPLE_FREQUENCY 96000 // TIM8
+#define BUFFER_SIZE 96
+#define DAC_MAX 4095
+#define DAC_MID DAC_MAX / 2
+//#define DAC_MID 2047
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,21 +53,39 @@ ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
 DAC_HandleTypeDef hdac;
+DMA_HandleTypeDef hdma_dac1;
+DMA_HandleTypeDef hdma_dac2;
 
 TIM_HandleTypeDef htim8;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-uint32_t tim_cnt = 0, hb_cnt = 0, fb_cnt = 0;
-uint16_t in_buffer[SAMPLES * 4 * 2];
-uint16_t out_buffer[2][SAMPLES * 2];
 
-uint16_t vref_avg = 0;
-uint16_t temp_avg = 0;
-float vdda = 0; // Result of VDDA calculation
-float vref = 0; // Result of vref calculation
-float temp = 0; // Result of temp calculation
+// Actual buffers used by DMA from adcs and to dacs
+uint16_t adc_buffer[BUFFER_SIZE * 2 * 4] = { 0 };
+uint16_t dac1_buffer[BUFFER_SIZE * 2] = { 0 };
+uint16_t dac2_buffer[BUFFER_SIZE * 2] = { 0 };
+
+uint16_t *adc_buffer_ptr = adc_buffer;
+uint16_t *dac1_buffer_ptr = dac1_buffer;
+uint16_t *dac2_buffer_ptr = dac2_buffer;
+
+// Stuff used for wave calculations
+float osc1_angle = 0;               // Current angle
+float osc1_angle_per_sample = 0;    // Angular velocity - calculated from freq
+float osc1_amp = 1;
+float osc2_angle = 0;
+float osc2_angle_per_sample = 0;
+float osc2_amp = 1;
+
+uint32_t dac_count = 0; // Count dma buffer transfers
+uint32_t adc_count = 0; //
+
+// Potentiometer values
+uint16_t pot0 = 0;
+uint16_t pot1 = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -75,6 +102,7 @@ static void MX_USART1_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
 // Send stdout to USART1 and stderr to SWO
 int _write(int fd, char *ptr, int len) {
 
@@ -94,47 +122,107 @@ int _write(int fd, char *ptr, int len) {
     return -1;
 }
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-    if (htim->Instance == TIM8) {
-        ++tim_cnt;
-    }
+// Technically we're not interested in frequency but instead
+// immediately calculate the angular velocity.
+void set_osc1_freq(float freq) {
+    osc1_angle_per_sample = M_PI2 / (SAMPLE_FREQUENCY / freq);
 }
 
-// Process half a buffer full of data
-static inline void process_adc_buffer(uint16_t *buffer) {
-
-    uint32_t sum1 = 0, sum2 = 0;
-    for (int i = 0; i < SAMPLES; ++i) {
-        sum1 += buffer[2 + i * 4];
-        sum2 += buffer[3 + i * 4];
-    }
-
-    vref_avg = sum2 / SAMPLES;
-    temp_avg = sum1 / SAMPLES;
-
-    // VDDA can be calculated based on the measured vref and the calibration data
-    vdda = (float) VREFINT_CAL_VREF * *VREFINT_CAL_ADDR / vref_avg / 1000;
-    //vdda = VREFINT_CAL_VREF * *VREFINT_CAL_ADDR / vref_avg / 1000;
-
-    // Knowing vdda and the resolution of adc - the actual voltage can be calculated
-    vref = (float)( vdda / 4096 * vref_avg );
-    //vref = __LL_ADC_CALC_VREFANALOG_VOLTAGE(vref_avg, ADC_RESOLUTION_12B);
-
-
-    temp = (float) ( (float)( (float)(TEMPSENSOR_CAL2_TEMP - TEMPSENSOR_CAL1_TEMP) / (float)(*TEMPSENSOR_CAL2_ADDR - *TEMPSENSOR_CAL1_ADDR)) * (temp_avg - *TEMPSENSOR_CAL1_ADDR) + TEMPSENSOR_CAL1_TEMP);
-    //temp = __LL_ADC_CALC_TEMPERATURE(vref, temp_avg, ADC_RESOLUTION_12B);
-
+void set_osc2_freq(float freq) {
+    osc2_angle_per_sample = M_PI2 / (SAMPLE_FREQUENCY / freq);
 }
 
-void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc) {
-    process_adc_buffer(&in_buffer[0]); // We're half way through the buffer, so can safely deal with first half
-    ++hb_cnt;
+// Get pot values - average of 48 samples each pot
+static inline void update_pots(uint16_t *sample_ptr) {
+
+    //HAL_GPIO_WritePin(DBG0_GPIO_Port, DBG0_Pin, GPIO_PIN_SET);
+
+    uint32_t pot0_value = 0;
+    uint32_t pot1_value = 0;
+    for (uint8_t i = 0; i < BUFFER_SIZE; ++i) {
+        pot0_value += (uint16_t) *sample_ptr;
+        sample_ptr++;
+        pot1_value += (uint16_t) *sample_ptr;
+        sample_ptr++;
+        sample_ptr++;
+        sample_ptr++;
+    }
+    pot0 = pot0_value / BUFFER_SIZE;
+    pot1 = pot1_value / BUFFER_SIZE;
+
+    //set_osc1_freq((float) (4096 - pot0) / 4);
+    //osc1_amp = (float) (4096.0 - pot1) / 4096;
+
+    adc_count++;
+
+    //HAL_GPIO_WritePin(DBG0_GPIO_Port, DBG0_Pin, GPIO_PIN_RESET);
+
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-    process_adc_buffer(&in_buffer[SAMPLES * 4]); // We're all the way through the buffer, so deal with second half
-    ++fb_cnt;
+    if (hadc->Instance == ADC1) {
+
+        update_pots(&adc_buffer[BUFFER_SIZE]);
+
+    }
 }
+
+void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc) {
+    if (hadc->Instance == ADC1) {
+
+        update_pots(&adc_buffer[0]);
+
+    }
+}
+
+static inline void update_osc_buffers() {
+
+    //HAL_GPIO_WritePin(DBG0_GPIO_Port, DBG0_Pin, GPIO_PIN_SET);
+
+    for (uint8_t sample = 0; sample < BUFFER_SIZE; sample++) {
+
+        *dac1_buffer_ptr = (uint16_t) (DAC_MID
+                + osc1_amp * arm_sin_f32(osc1_angle) * DAC_MID);
+        *dac2_buffer_ptr = (uint16_t) (DAC_MID
+                + osc2_amp * arm_sin_f32(osc2_angle) * DAC_MID);
+        osc1_angle += osc1_angle_per_sample;
+        osc2_angle += osc2_angle_per_sample;
+        dac1_buffer_ptr++;
+        dac2_buffer_ptr++;
+
+        if (osc1_angle > M_PI2)
+            osc1_angle -= M_PI2;
+        if (osc2_angle > M_PI2)
+            osc2_angle -= M_PI2;
+
+    }
+
+    dac_count++;
+
+    //HAL_GPIO_WritePin(DBG0_GPIO_Port, DBG0_Pin, GPIO_PIN_RESET);
+
+}
+
+// Contrary to the name this callback actually handles both channels
+void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
+
+    dac1_buffer_ptr = &dac1_buffer[BUFFER_SIZE];
+    dac2_buffer_ptr = &dac2_buffer[BUFFER_SIZE];
+
+    update_osc_buffers();
+
+}
+
+// Contrary to the name this callback actually handles both channels
+void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
+
+    dac1_buffer_ptr = &dac1_buffer[0];
+    dac2_buffer_ptr = &dac2_buffer[0];
+
+    update_osc_buffers();
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -172,34 +260,48 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*) in_buffer, SAMPLES * 4 * 2); // Now fire up the ADC DMA
+    HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adc_buffer, BUFFER_SIZE * 2 * 4);
 
-  HAL_TIM_Base_Start_IT(&htim8); // First get the timer running
+    HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_1, (uint32_t*) dac1_buffer, BUFFER_SIZE * 2, DAC_ALIGN_12B_R);
+    HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_2, (uint32_t*) dac2_buffer, BUFFER_SIZE * 2, DAC_ALIGN_12B_R);
+
+    set_osc1_freq(440);
+    osc1_amp = 0.99;
+
+    set_osc2_freq(441);
+    osc2_amp = 0.99;
+
+    // Finally fire up the timer
+    HAL_TIM_Base_Start_IT(&htim8);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint32_t now = 0, last_blink = 0, last_tick = 0;
+    uint32_t now = 0, last_blink = 0, last_tick = 0, idle_cnt = 0;
 
-  while (1)
-  {
+    while (1)
+    {
 
-      now = HAL_GetTick();
+        now = HAL_GetTick();
 
-      if (now - last_blink >= 500) {
-          HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-          last_blink = now;
-      }
+        if (now - last_blink >= 500) {
+            HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+            last_blink = now;
+        }
 
-      if (now - last_tick >= 1000) {
-          DBG("T = %lu HB = %lu FB = %lu VDDA = %5.3f V Vref = %5.3f V (raw = %d) Temp = %4.2f °C (raw = %d)", tim_cnt, hb_cnt, fb_cnt, (float)vdda, (float)vref, vref_avg, (float)temp, temp_avg);
-          last_tick = now;
-      }
+        if (now - last_tick >= 1000) {
+            DBG("Tick %lu - idle = %lu adc = %lu dac = %lu", now / 1000, idle_cnt, adc_count, dac_count);
+            idle_cnt = 0;
+            last_tick = now;
+        }
+
+        ++idle_cnt;
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+    }
   /* USER CODE END 3 */
 }
 
@@ -289,7 +391,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_56CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -393,9 +495,9 @@ static void MX_TIM8_Init(void)
 
   /* USER CODE END TIM8_Init 1 */
   htim8.Instance = TIM8;
-  htim8.Init.Prescaler = 839;
+  htim8.Init.Prescaler = AUD_CNT;
   htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim8.Init.Period = 999;
+  htim8.Init.Period = AUD_PRE;
   htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim8.Init.RepetitionCounter = 0;
   htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
@@ -461,8 +563,15 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+  /* DMA1_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
@@ -511,11 +620,11 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    while (1)
+    {
+    }
   /* USER CODE END Error_Handler_Debug */
 }
 

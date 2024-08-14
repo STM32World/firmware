@@ -60,6 +60,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define AUD_CNT 4
+#define AUD_PRE 349
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
 
