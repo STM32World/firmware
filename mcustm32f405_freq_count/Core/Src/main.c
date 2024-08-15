@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BUFFER_SIZE 128
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,18 +42,24 @@
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
+DMA_HandleTypeDef hdma_tim2_ch1;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
+uint32_t interrupt_count = 0;
+
 uint32_t last_count = 0;
+
+uint32_t dma_buffer[2 * BUFFER_SIZE];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM2_Init(void);
@@ -79,8 +85,12 @@ int _write(int fd, char* ptr, int len) {
 }
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
-        last_count = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1) + 2;
+        //last_count = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1) + 2;
+    //last_count =  htim->Instance->CCR1;
+    last_count = dma_buffer[0];
+    ++interrupt_count;
 }
+
 /* USER CODE END 0 */
 
 /**
@@ -112,6 +122,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_TIM4_Init();
   MX_TIM2_Init();
@@ -123,7 +134,8 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 
-  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+  //HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_IC_Start_DMA(&htim2, TIM_CHANNEL_1, (uint32_t *)&dma_buffer, sizeof(dma_buffer) / sizeof(dma_buffer[0]));
 
   /* USER CODE END 2 */
 
@@ -145,7 +157,9 @@ int main(void)
       if (now >= next_tick) {
           double freq = (double) count_freq / last_count;
 
-          printf("Tick %lu - last count = %6lu - freq = %6.2f\n", now / 1000, last_count, freq);
+          printf("Tick %lu - int count = %lu - last count = %6lu - freq = %6.2f\n", now / 1000, interrupt_count, last_count, freq);
+
+          interrupt_count = 0;
           next_tick = now + 1000;
       }
 
@@ -294,9 +308,9 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 1;
+  htim4.Init.Prescaler = 0;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 77;
+  htim4.Init.Period = 4;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
@@ -310,7 +324,7 @@ static void MX_TIM4_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 5;
+  sConfigOC.Pulse = 1;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -354,6 +368,22 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
 
 }
 
