@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 32
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,9 +50,8 @@ UART_HandleTypeDef huart1;
 
 uint32_t interrupt_count = 0;
 
-uint32_t last_count = 0;
-
-uint32_t dma_buffer[2 * BUFFER_SIZE];
+uint32_t dma_buffer[BUFFER_SIZE];
+uint8_t buffer_idx = 0;
 
 /* USER CODE END PV */
 
@@ -85,9 +84,11 @@ int _write(int fd, char* ptr, int len) {
 }
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
-        //last_count = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1) + 2;
-    //last_count =  htim->Instance->CCR1;
-    last_count = dma_buffer[0];
+//    uint64_t total = 0;
+//    for (int i = 0; i < BUFFER_SIZE; ++i) {
+//        total += dma_buffer[i];
+//    }
+//    last_count = total / BUFFER_SIZE;
     ++interrupt_count;
 }
 
@@ -134,7 +135,6 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 
-  //HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
   HAL_TIM_IC_Start_DMA(&htim2, TIM_CHANNEL_1, (uint32_t *)&dma_buffer, sizeof(dma_buffer) / sizeof(dma_buffer[0]));
 
   /* USER CODE END 2 */
@@ -155,12 +155,21 @@ int main(void)
       }
 
       if (now >= next_tick) {
-          double freq = (double) count_freq / last_count;
 
-          printf("Tick %lu - int count = %lu - last count = %6lu - freq = %6.2f\n", now / 1000, interrupt_count, last_count, freq);
+          uint64_t total = 0;
+          for (int i = 0; i < BUFFER_SIZE; ++i) {
+              total += dma_buffer[i];
+          }
+
+          uint32_t count = total / BUFFER_SIZE;
+
+          float freq = (float) count_freq / count;
+
+          printf("Tick %lu - int count = %lu - last count = %6lu - freq = %6.2f\n", now / 1000, interrupt_count, count, freq);
 
           interrupt_count = 0;
           next_tick = now + 1000;
+
       }
 
     /* USER CODE END WHILE */
@@ -310,7 +319,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 0;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 4;
+  htim4.Init.Period = 9;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
@@ -326,7 +335,7 @@ static void MX_TIM4_Init(void)
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 2;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCFastMode = TIM_OCFAST_ENABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
