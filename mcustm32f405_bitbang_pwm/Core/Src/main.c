@@ -89,7 +89,7 @@ int _write(int fd, char *ptr, int len) {
 }
 
 // Callback which runs the PWM
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+inline void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
     if (htim->Instance == TIM10) {
 
@@ -99,9 +99,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         // Switch LED on off or on depending on value of led_pwm_cnt.
         *led_bb_bit = (uint8_t) led_pwm_cnt >= led_pwm_val ? 1 : 0;
 
+        // NOTICE!  Huge unsolved mystery
         // Use BSRR to set or reset bit 13 of the LED GPIO port.  This works perfectly on
         // STM32F411 but for some bizarre reason it does not work on STM32F405.
-        //LED_GPIO_Port->BSRR = led_pwm_cnt <= led_pwm_val ? GPIO_BSRR_BR13 : GPIO_BSRR_BS13;
+        //LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
 
     }
 
