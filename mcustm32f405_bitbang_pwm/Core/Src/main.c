@@ -102,9 +102,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         // NOTICE!  Huge unsolved mystery
         // Use BSRR to set or reset bit 13 of the LED GPIO port.  This works perfectly on
         // STM32F411 but for some bizarre reason it does not work on STM32F405.
-        //LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
-        //LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
-        //LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? LED_Pin : (LED_Pin << 16);
+//        LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
+//        LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? LED_Pin : (LED_Pin << 16);
 //        if (led_pwm_cnt >= led_pwm_val) {
 //            LED_GPIO_Port->BSRR = GPIO_BSRR_BS13;
 //        } else {
