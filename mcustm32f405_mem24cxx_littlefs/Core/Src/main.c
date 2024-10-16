@@ -107,6 +107,10 @@ int _write(int fd, char *ptr, int len) {
     return -1;
 }
 
+inline uint32_t HAL_GetTick(void) {
+  return uwTick;
+}
+
 int lfs_ls(lfs_t *lfs, const char *path) {
     lfs_dir_t dir;
     int err = lfs_dir_open(lfs, &dir, path);
@@ -272,6 +276,7 @@ void do_files() {
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
