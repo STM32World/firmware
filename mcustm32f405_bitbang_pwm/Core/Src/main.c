@@ -63,7 +63,7 @@ UART_HandleTypeDef huart1;
 // Variables to run the pwm.  led_pwm_cnt goes from 0-255 and then roll back over to 0.
 // led_pwm_val determines the ratio between on and off status of the LED.
 uint32_t cb_cnt = 0;
-uint32_t led_pwm_cnt;
+uint8_t led_pwm_cnt;
 uint8_t led_pwm_val = 0x00;
 int8_t led_pwm_chg = 1;
 
@@ -110,20 +110,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         ++led_pwm_cnt;
 
         // Switch LED on off or on depending on value of led_pwm_cnt.
-        *led_bb_bit = (uint8_t) led_pwm_cnt >= led_pwm_val ? 1 : 0;
+        //*led_bb_bit = (uint8_t) led_pwm_cnt >= led_pwm_val ? 1 : 0;
 
         //*test_bb_bit = (uint8_t) led_pwm_cnt >= led_pwm_val ? 1 : 0;
 
         // NOTICE!  Huge unsolved mystery
         // Use BSRR to set or reset bit 13 of the LED GPIO port.  This works perfectly on
         // STM32F411 but for some bizarre reason it does not work on STM32F405.
-//        LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
-//        LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? LED_Pin : (LED_Pin << 16);
-//        if (led_pwm_cnt >= led_pwm_val) {
-//            LED_GPIO_Port->BSRR = GPIO_BSRR_BS13;
-//        } else {
-//            LED_GPIO_Port->BSRR = GPIO_BSRR_BR13;
-//        }
+        LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
 
         ++cb_cnt;
 
