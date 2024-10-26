@@ -103,8 +103,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         // Increase the counter - it will roll over automatically every 256 counts
         ++led_pwm_cnt;
 
-        // Switch LED on off or on depending on value of led_pwm_cnt.
-        //*led_bb_bit = (uint8_t) led_pwm_cnt >= led_pwm_val ? 1 : 0;
+        // Use bitband to switch LED on off or on depending on value of led_pwm_cnt.
+        //*led_bb_bit = led_pwm_cnt >= led_pwm_val ? 1 : 0;
 
         // Use BSRR to set or reset bit 13 of the LED GPIO port.
         LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
@@ -160,7 +160,8 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-    uint32_t now = 0, next_tick = 1000, next_change = 10;
+
+    uint32_t now = 0, next_tick = 1000, next_change = 10, last_int_cnt = 0;
 
     while (1) {
 
