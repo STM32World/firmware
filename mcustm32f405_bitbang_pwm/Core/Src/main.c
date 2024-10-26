@@ -32,16 +32,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-
-#define BITBAND_SRAM_REF 0x20000000
-#define BITBAND_SRAM_BASE 0x22000000
-#define BITBAND_PERIPH_REF 0x40000000
-#define BITBAND_PERIPH_BASE 0x42000000
-
-#define bitband_t *(volatile uint32_t*)
-
-#define m_BITBAND_SRAM(address,bit) (BITBAND_SRAM_BASE +   (((uint32_t)address) - BITBAND_SRAM_REF) * 32 + (bit) * 4)
-#define m_BITBAND_PERIPH(address,bit) (BITBAND_PERIPH_BASE + (((uint32_t)address) - BITBAND_PERIPH_REF) * 32 + (bit) * 4)
+#define BITBAND_SRAM(address,bit) (SRAM1_BB_BASE + (((uint32_t)address) - SRAM1_BASE) * 32 + (bit) * 4)
+#define BITBAND_PERIPH(address,bit) (PERIPH_BB_BASE + (((uint32_t)address) - PERIPH_BASE) * 32 + (bit) * 4)
 
 // The BITBAND_BIT_ADDR calculate the bitband address of any bit.
 #define BITBAND_BIT_ADDR(src_byte_addr, bit)  (((((uint32_t)(src_byte_addr) & 0x000fffff) << 5) | ((uint32_t)(src_byte_addr) & 0xfff00000) | 0x02000000) + (((uint32_t)(bit)) << 2))
@@ -63,7 +55,7 @@ UART_HandleTypeDef huart1;
 // Variables to run the pwm.  led_pwm_cnt goes from 0-255 and then roll back over to 0.
 // led_pwm_val determines the ratio between on and off status of the LED.
 uint32_t cb_cnt = 0;
-uint8_t led_pwm_cnt;
+// uint8_t led_pwm_cnt;
 uint8_t led_pwm_val = 0x00;
 int8_t led_pwm_chg = 1;
 
@@ -104,6 +96,8 @@ int _write(int fd, char *ptr, int len) {
 // Callback which runs the PWM
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
+    static uint8_t led_pwm_cnt = 0xff; // Moved here from global as it is only used here
+
     if (htim->Instance == TIM10) {
 
         // Increase the counter - it will roll over automatically every 256 counts
@@ -112,11 +106,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         // Switch LED on off or on depending on value of led_pwm_cnt.
         //*led_bb_bit = (uint8_t) led_pwm_cnt >= led_pwm_val ? 1 : 0;
 
-        //*test_bb_bit = (uint8_t) led_pwm_cnt >= led_pwm_val ? 1 : 0;
-
-        // NOTICE!  Huge unsolved mystery
-        // Use BSRR to set or reset bit 13 of the LED GPIO port.  This works perfectly on
-        // STM32F411 but for some bizarre reason it does not work on STM32F405.
+        // Use BSRR to set or reset bit 13 of the LED GPIO port.
         LED_GPIO_Port->BSRR = led_pwm_cnt >= led_pwm_val ? GPIO_BSRR_BS13 : GPIO_BSRR_BR13;
 
         ++cb_cnt;
@@ -136,9 +126,7 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
-    led_bb_bit = (uint8_t *)m_BITBAND_PERIPH(&LED_GPIO_Port->ODR, 13);
-    test_bb_bit = (uint8_t *)m_BITBAND_PERIPH(&TEST_GPIO_Port->ODR, 14);
-
+    led_bb_bit = (uint8_t *)BITBAND_PERIPH(&LED_GPIO_Port->ODR, 13);
 
   /* USER CODE END 1 */
 
@@ -172,7 +160,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-    uint32_t now = 0, next_tick = 1000, next_change = 10, next_test = 100, last_int_cnt = 0;
+    uint32_t now = 0, next_tick = 1000, next_change = 10;
 
     while (1) {
 
@@ -191,21 +179,10 @@ int main(void)
 
         }
 
-//        if (now >= next_test) {
-//
-//            //printf("toggle\n");
-//
-//            GPIOC->BSRR = GPIOC->ODR && TEST_Pin ? GPIO_BSRR_BR14 : GPIO_BSRR_BS14;
-//            //*test_bb_bit = TEST_GPIO_Port->ODR && TEST_Pin ? 0 : 1;
-//
-//            next_test = now + 100;
-//        }
-
         if (now >= next_tick) {
 
-            DBG("Tick %lu (loop = %lu cb = %lu int = %lu) val = 0x%02x\n", now / 1000, loop_cnt, cb_cnt, led_pwm_cnt - last_int_cnt, led_pwm_val);
+            DBG("Tick %lu (loop = %lu cb = %lu)\n", now / 1000, loop_cnt, cb_cnt);
 
-            last_int_cnt = led_pwm_cnt;
             loop_cnt = 0;
 
             next_tick = now + 1000;

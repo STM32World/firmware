@@ -32,7 +32,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define ARRAY_SIZE 26 * 1024
+#define ARRAY_SIZE 16 * 1024
 
 /* USER CODE END PD */
 
@@ -44,11 +44,14 @@
 /* Private variables ---------------------------------------------------------*/
 RNG_HandleTypeDef hrng;
 
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
-int arr[ARRAY_SIZE];
+int arr[ARRAY_SIZE] __attribute__((section(".ccmram")));
+//int arr[ARRAY_SIZE];
 
 /* USER CODE END PV */
 
@@ -57,6 +60,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_RNG_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -149,6 +153,7 @@ void quickSort(int arr[], int low, int high) {
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -173,29 +178,39 @@ int main(void)
   MX_GPIO_Init();
   MX_RNG_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
     DBG("Firing up\n");
 
+    HAL_TIM_Base_Start(&htim2);
+
     int i = 0;
+    uint32_t t;
 
     DBG("Size of int = %d\n", sizeof(i));
 
     DBG("Filling random\n");
 
+    htim2.Instance->CNT = 0;
     fill_random(arr, sizeof(arr));
+    t = htim2.Instance->CNT;
+    DBG("fill_random took %lu us\n", t);
 
-    for (i = 0; i < sizeof(arr) / sizeof(arr[0]); ++i) {
-        DBG("%d\n", arr[i]);
-    }
+//    for (i = 0; i < sizeof(arr) / sizeof(arr[0]); ++i) {
+//        DBG("%d\n", arr[i]);
+//    }
 
     DBG("Sorting\n");
 
+    htim2.Instance->CNT = 0;
     quickSort(arr, 0, sizeof(arr) / sizeof(arr[0]) - 1);
+    t = htim2.Instance->CNT;
+    DBG("quick sort took %lu us\n", t);
 
-    for (i = 0; i < sizeof(arr) / sizeof(arr[0]); ++i) {
-        DBG("%d\n", arr[i]);
-    }
+//    for (i = 0; i < sizeof(arr) / sizeof(arr[0]); ++i) {
+//        DBG("%d\n", arr[i]);
+//    }
 
   /* USER CODE END 2 */
 
@@ -214,10 +229,10 @@ int main(void)
             last_blink = now;
         }
 
-        if (now - last_tick >= 1000) {
-            DBG("Tick %lu\n", now / 1000);
-            last_tick = now;
-        }
+//        if (now - last_tick >= 1000) {
+//            DBG("Tick %lu\n", now / 1000);
+//            last_tick = now;
+//        }
 
     /* USER CODE END WHILE */
 
@@ -294,6 +309,51 @@ static void MX_RNG_Init(void)
   /* USER CODE BEGIN RNG_Init 2 */
 
   /* USER CODE END RNG_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 84 - 1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
